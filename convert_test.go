@@ -215,7 +215,9 @@ func TestConvertAlignedBible(t *testing.T) {
 	verifyRootFileCopying(t, inDir, outDir, generated)
 }
 
-// TestConvertTranslationWords tests conversion of Translation Words.
+// TestConvertTranslationWords tests conversion of Translation Words with TWL payload.
+// TW is converted like TWL: TW bible/ becomes ingredients/payload/, and twl_*.tsv files
+// from the sibling <lang>_twl/ directory become the main ingredients with rewritten links.
 func TestConvertTranslationWords(t *testing.T) {
 	samples := samplesDir(t)
 	sampleDir := filepath.Join(samples, "Translation Words")
@@ -239,7 +241,120 @@ func TestConvertTranslationWords(t *testing.T) {
 
 	compareStructuralMetadata(t, expected, generated)
 	verifyInternalConsistency(t, generated, outDir)
+
+	// Verify payload was included (TW bible/ → ingredients/payload/)
+	payloadCount := 0
+	for key := range generated.Ingredients {
+		if strings.HasPrefix(key, "ingredients/payload/") {
+			payloadCount++
+		}
+	}
+	if payloadCount == 0 {
+		t.Error("Expected payload ingredients but found none")
+	}
+
+	// Verify TSV files had rc:// links rewritten to ./payload/ paths (if TWL dir exists)
+	for key := range generated.Ingredients {
+		if !strings.HasSuffix(key, ".tsv") {
+			continue
+		}
+		tsvPath := filepath.Join(outDir, key)
+		data, err := os.ReadFile(tsvPath)
+		if err != nil {
+			t.Errorf("reading %s: %v", key, err)
+			continue
+		}
+		content := string(data)
+		if strings.Contains(content, "rc://") {
+			t.Errorf("TSV file %s still contains rc:// links after rewrite", key)
+		}
+		if !strings.Contains(content, "./payload/") {
+			t.Errorf("TSV file %s does not contain ./payload/ paths after rewrite", key)
+		}
+		break // Only need to check one file
+	}
+
 	verifyRootFileCopying(t, inDir, outDir, generated)
+}
+
+// TestConvertTWWithTWLPath tests TW conversion using an explicit TWLPath option
+// instead of relying on auto-detection of <lang>_twl/ inside inDir.
+func TestConvertTWWithTWLPath(t *testing.T) {
+	samples := samplesDir(t)
+	sampleDir := filepath.Join(samples, "Translation Words")
+	inDir := filepath.Join(sampleDir, "rc")
+
+	// The <lang>_twl directory is inside the RC repo; we'll pass it explicitly via TWLPath
+	// Read the manifest to get the language identifier
+	manifestData, err := os.ReadFile(filepath.Join(inDir, "manifest.yaml"))
+	if err != nil {
+		t.Skip("manifest.yaml not found in TW sample; skipping TWLPath test")
+	}
+	// Simple scan for language identifier to find the twl dir
+	twlDir := ""
+	for _, line := range strings.Split(string(manifestData), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "identifier:") {
+			lang := strings.TrimSpace(strings.TrimPrefix(line, "identifier:"))
+			candidate := filepath.Join(inDir, lang+"_twl")
+			if _, err := os.Stat(candidate); err == nil {
+				twlDir = candidate
+				break
+			}
+		}
+	}
+	if twlDir == "" {
+		t.Skip("no <lang>_twl directory found in TW sample; skipping TWLPath test")
+	}
+
+	outDir := t.TempDir()
+	ctx := context.Background()
+
+	opts := rc2sb.Options{TWLPath: twlDir}
+	result, err := rc2sb.Convert(ctx, inDir, outDir, opts)
+	if err != nil {
+		t.Fatalf("Convert with TWLPath failed: %v", err)
+	}
+
+	if result.Subject != "Translation Words" {
+		t.Errorf("Subject = %q; want %q", result.Subject, "Translation Words")
+	}
+
+	generated := loadGeneratedMetadata(t, outDir)
+
+	// Verify payload was included
+	payloadCount := 0
+	for key := range generated.Ingredients {
+		if strings.HasPrefix(key, "ingredients/payload/") {
+			payloadCount++
+		}
+	}
+	if payloadCount == 0 {
+		t.Error("Expected payload ingredients with explicit TWLPath but found none")
+	}
+
+	// Verify TSV files had rc:// links rewritten
+	for key := range generated.Ingredients {
+		if !strings.HasSuffix(key, ".tsv") {
+			continue
+		}
+		tsvPath := filepath.Join(outDir, key)
+		data, err := os.ReadFile(tsvPath)
+		if err != nil {
+			t.Errorf("reading %s: %v", key, err)
+			continue
+		}
+		content := string(data)
+		if strings.Contains(content, "rc://") {
+			t.Errorf("TSV file %s still contains rc:// links after rewrite with TWLPath", key)
+		}
+		if !strings.Contains(content, "./payload/") {
+			t.Errorf("TSV file %s does not contain ./payload/ paths after rewrite with TWLPath", key)
+		}
+		break
+	}
+
+	verifyInternalConsistency(t, generated, outDir)
 }
 
 // TestConvertTranslationAcademy tests conversion of Translation Academy.

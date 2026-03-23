@@ -34,6 +34,7 @@ func Convert(ctx context.Context, inDir string, outDir string, opts Options) (Re
 
 - Reads `manifest.yaml` from `inDir`, determines the subject, looks up the handler, runs conversion, writes `metadata.json` to `outDir`.
 - `Options.PayloadPath` specifies an explicit path to a `<lang>_tw` directory for TWL payload creation. If empty, auto-detects `<lang>_tw/` inside `inDir`.
+- `Options.TWLPath` specifies an explicit path to a `<lang>_twl` directory for TW conversion. If empty, auto-detects `<lang>_twl/` inside `inDir`.
 - `Options.USFMPath` specifies a directory containing USFM files for localized Bible book names (used by TSV handlers). Bible handlers read USFM directly from their own input files.
 
 ### Package Structure
@@ -83,7 +84,7 @@ go-rc2sb/
 | Bible | scripture/textTranslation | uWBurritos | (from RC identifier) |
 | Hebrew Old Testament | scripture/textTranslation | uWBurritos | (from RC identifier) |
 | Greek New Testament | scripture/textTranslation | uWBurritos | (from RC identifier) |
-| Translation Words | peripheral/x-peripheralArticles | uWBurritos | TW |
+| Translation Words | parascriptural/x-bcvarticles | uWBurritos | TW |
 | Translation Academy | peripheral/x-peripheralArticles | uWBurritos | TA |
 | TSV Translation Notes | parascriptural/x-bcvnotes | uWBurritos | TN |
 | TSV Translation Questions | parascriptural/x-bcvquestions | uWBurritos | TQ |
@@ -107,14 +108,15 @@ go-rc2sb/
 1. **Metadata**: Transform `manifest.yaml` (Dublin Core) into `metadata.json` (Scripture Burrito schema) — map identifiers, versions, languages, project info
 2. **File relocation**: Copy content files into `ingredients/` directory, adjusting paths per resource type (e.g., strip `tn_` prefix from TSV filenames, strip numeric prefix from USFM filenames)
 3. **Checksum computation**: SB metadata.json requires MD5 checksums, MIME types, and byte sizes for every ingredient file
-4. **Content preservation**: File contents (Markdown, USFM, TSV) are unchanged between formats (except TWL TSV link rewriting)
+4. **Content preservation**: File contents (Markdown, USFM, TSV) are unchanged between formats (except TW/TWL TSV link rewriting)
 5. **Root file copying**: README.md, .gitignore, .gitea/, .github/ are copied from RC to SB root if present (not .git/)
 6. **TWL payload resolution**: If `Options.PayloadPath` is set or a `<lang>_tw/` subdirectory exists in the RC repo (where `<lang>` = `dublin_core.language.identifier`), copies the TW `bible/*` to `ingredients/payload/` and rewrites `rc://*/tw/dict/bible/{path}` links in TSV files to `./payload/{path}.md`
+6b. **TW conversion (like TWL)**: Translation Words repos are converted identically to TWL — the TW `bible/*` is always copied to `ingredients/payload/`. If `Options.TWLPath` is set or a `<lang>_twl/` subdirectory exists in the RC repo, its `twl_*.tsv` files are processed as main ingredients (strip `twl_` prefix, rewrite `rc://` links to `./payload/` paths, set per-book scope).
 7. **Localized book names**: Bible book names in `localizedNames` are resolved by priority: (1) USFM `\toc1`/`\toc2`/`\toc3` markers from the USFM file itself (Bible handlers) or from `Options.USFMPath` (TSV handlers), (2) manifest `projects[].title`, (3) English fallback from `books/books.go`. The `books.ParseUSFMBookNames()` function reads the first 20 lines of a USFM file to extract these markers, falling back to `\mt`/`\h` when toc markers are absent.
 
 ### Testing
 
-- **Integration tests** (`convert_test.go`): One test per subject type (11 total). Requires `samples/` directory (gitignored) with RC/SB pairs. Tests compare structural metadata (flavor type, scope keys, abbreviation, language, ingredient keys) and verify internal consistency (every ingredient exists on disk with correct MD5 and size).
+- **Integration tests** (`convert_test.go`): One test per subject type (12 total, including TWLPath and TWLPath variant tests). Requires `samples/` directory (gitignored) with RC/SB pairs. Tests compare structural metadata (flavor type, scope keys, abbreviation, language, ingredient keys) and verify internal consistency (every ingredient exists on disk with correct MD5 and size).
 - **Unit tests**: `rc/manifest_test.go`, `sb/ingredient_test.go`, `sb/metadata_test.go`, `books/books_test.go`
 - **Error handling tests** (`error_test.go`): Missing manifest, unsupported subject, cancelled context, invalid YAML
 

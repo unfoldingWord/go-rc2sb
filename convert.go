@@ -42,6 +42,7 @@ func Convert(ctx context.Context, inDir string, outDir string, opts Options) (Re
 	// Run the handler
 	handlerOpts := handler.Options{
 		PayloadPath: opts.PayloadPath,
+		TWLPath:     opts.TWLPath,
 		USFMPath:    opts.USFMPath,
 	}
 	metadata, err := h.Convert(ctx, manifest, inDir, outDir, handlerOpts)

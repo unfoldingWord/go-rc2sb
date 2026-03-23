@@ -13,6 +13,17 @@ type Options struct {
 	// If neither is found, no payload is created and TSV files are copied as-is.
 	PayloadPath string
 
+	// TWLPath is the path to a TSV Translation Words Links directory (e.g., "/path/to/en_twl")
+	// used when converting Translation Words repos.
+	// If set, the twl_*.tsv files within this path are processed as the main ingredients,
+	// rc:// links in the TSV files are rewritten to relative ./payload/ paths, and the
+	// TW bible/ content is copied to ingredients/payload/.
+	//
+	// If empty, the TW handler auto-detects a <lang>_twl/ subdirectory inside
+	// the input RC repo directory (where <lang> is the manifest's language identifier).
+	// If neither is found, no TSV ingredients are created; only the payload is written.
+	TWLPath string
+
 	// USFMPath is the path to a directory containing USFM files for localized
 	// Bible book names. This is used by TSV handlers (TN, TQ, TWL) to extract
 	// \toc1, \toc2, \toc3 markers for book names in the target language.

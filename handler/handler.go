@@ -14,6 +14,10 @@ type Options struct {
 	// See rc2sb.Options.PayloadPath for details.
 	PayloadPath string
 
+	// TWLPath is the path to a TSV Translation Words Links directory for TW conversion.
+	// See rc2sb.Options.TWLPath for details.
+	TWLPath string
+
 	// USFMPath is the path to a directory containing USFM files for localized book names.
 	// See rc2sb.Options.USFMPath for details.
 	USFMPath string

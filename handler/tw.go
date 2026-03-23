@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/unfoldingWord/go-rc2sb/books"
 	"github.com/unfoldingWord/go-rc2sb/rc"
 	"github.com/unfoldingWord/go-rc2sb/sb"
 )
@@ -28,18 +30,85 @@ func (h *twHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, o
 
 	m := BuildBaseMetadata(manifest, "uWBurritos", "TW")
 
-	// Set type - peripheral/x-peripheralArticles
+	// Set type - parascriptural/x-bcvarticles (same as TWL)
+	currentScope := make(map[string][]string)
 	m.Type = sb.Type{
 		FlavorType: sb.FlavorType{
-			Name: "peripheral",
+			Name: "parascriptural",
 			Flavor: sb.Flavor{
-				Name: "x-peripheralArticles",
+				Name: "x-bcvarticles",
 			},
 		},
 	}
 
 	m.Copyright = BuildCopyright(manifest, false)
 	m.LocalizedNames = map[string]sb.LocalizedName{}
+
+	lang := manifest.DublinCore.Language.Identifier
+
+	// Always copy TW bible/ to ingredients/payload/
+	bibleDir := filepath.Join(inDir, "bible")
+	if err := copyTreeToIngredients(bibleDir, outDir, "ingredients/payload", m); err != nil {
+		return nil, fmt.Errorf("copying TW bible to payload: %w", err)
+	}
+
+	// Determine TWL source: explicit TWLPath option, or auto-detect <lang>_twl/ in inDir
+	var twlDir string
+	if opts.TWLPath != "" {
+		twlDir = opts.TWLPath
+	} else {
+		twlDir = filepath.Join(inDir, lang+"_twl")
+	}
+
+	_, twlDirErr := os.Stat(twlDir)
+	hasTWL := twlDirErr == nil
+
+	if hasTWL {
+		// Find all twl_*.tsv files in the TWL directory
+		tsvFiles, err := filepath.Glob(filepath.Join(twlDir, "twl_*.tsv"))
+		if err != nil {
+			return nil, fmt.Errorf("finding TWL TSV files: %w", err)
+		}
+
+		for _, srcPath := range tsvFiles {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+
+			srcFilename := filepath.Base(srcPath)
+			// Strip "twl_" prefix: "twl_GEN.tsv" -> "GEN.tsv"
+			destFilename := strings.TrimPrefix(srcFilename, "twl_")
+			ingredientKey := "ingredients/" + destFilename
+
+			// Derive book code from filename: "GEN.tsv" -> "GEN"
+			bookCode := strings.TrimSuffix(destFilename, ".tsv")
+			scope := map[string][]string{bookCode: {}}
+			currentScope[bookCode] = []string{}
+
+			// Add localized name
+			bookID := strings.ToLower(bookCode)
+			var usfmNames *books.LocalizedBookNames
+			if opts.USFMPath != "" {
+				if usfmFile := books.FindUSFMFile(opts.USFMPath, bookID); usfmFile != "" {
+					usfmNames = books.ParseUSFMBookNames(usfmFile)
+				}
+			}
+			key, localizedName := books.LocalizedNameEntryWithNames(bookID, lang, "", usfmNames)
+			if key != "" {
+				m.LocalizedNames[key] = localizedName
+			}
+
+			// Copy TSV file with rc:// link rewriting
+			ing, err := copyTSVWithLinkRewrite(srcPath, outDir, ingredientKey, scope)
+			if err != nil {
+				return nil, fmt.Errorf("copying %s with link rewrite: %w", srcFilename, err)
+			}
+			m.Ingredients[ingredientKey] = ing
+		}
+	}
+
+	// Set the currentScope
+	m.Type.FlavorType.CurrentScope = currentScope
 
 	// Copy common root files (README.md, .gitignore, .gitea, .github)
 	if err := CopyCommonRootFiles(inDir, outDir, m); err != nil {
@@ -51,14 +120,7 @@ func (h *twHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, o
 		return nil, fmt.Errorf("copying root LICENSE.md: %w", err)
 	}
 
-	// Copy bible/ contents to ingredients/
-	// Structure: bible/{kt,other,names}/*.md and bible/config.yaml
-	bibleDir := filepath.Join(inDir, "bible")
-	if err := copyTreeToIngredients(bibleDir, outDir, "ingredients", m); err != nil {
-		return nil, fmt.Errorf("copying bible directory: %w", err)
-	}
-
-	// Copy LICENSE.md to ingredients/LICENSE.md (uses embedded default if RC doesn't have one).
+	// Copy LICENSE.md to ingredients/
 	licIng, err := CopyLicenseIngredient(inDir, outDir)
 	if err != nil {
 		return nil, fmt.Errorf("copying ingredients/LICENSE.md: %w", err)
