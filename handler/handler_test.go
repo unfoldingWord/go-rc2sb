@@ -920,7 +920,7 @@ func TestLookup_UnsupportedSubject(t *testing.T) {
 // --- Missing LICENSE.md / README.md tests ---
 
 func TestCopyLicenseIngredient_MissingLicenseUsesDefault(t *testing.T) {
-	inDir := t.TempDir()  // No LICENSE.md
+	inDir := t.TempDir() // No LICENSE.md
 	outDir := t.TempDir()
 
 	ing, err := handler.CopyLicenseIngredient(inDir, outDir)
@@ -976,7 +976,7 @@ func TestCopyLicenseIngredient_ExistingLicensePreferred(t *testing.T) {
 }
 
 func TestCopyLicenseToRoot_MissingLicenseUsesDefault(t *testing.T) {
-	inDir := t.TempDir()  // No LICENSE.md
+	inDir := t.TempDir() // No LICENSE.md
 	outDir := t.TempDir()
 
 	err := handler.CopyLicenseToRoot(inDir, outDir)
@@ -1057,7 +1057,7 @@ func TestBible_ConvertsWithoutLicenseOrReadme(t *testing.T) {
 		t.Fatalf("Convert should not fail without LICENSE.md: %v", err)
 	}
 
-	// Verify ingredients/LICENSE.md exists with default content
+	// Verify LICENSE.md exists in ingredients/ with default content
 	if _, ok := metadata.Ingredients["ingredients/LICENSE.md"]; !ok {
 		t.Error("ingredients/LICENSE.md should exist in metadata using default license")
 	}
@@ -1264,7 +1264,7 @@ func TestOBS_RootLevelContent(t *testing.T) {
 		t.Fatalf("Convert failed: %v", err)
 	}
 
-	// Verify content files were copied as ingredients/content/
+	// Verify content files were copied as content/ ingredients
 	expectedContent := []string{
 		"ingredients/content/01.md",
 		"ingredients/content/02.md",
@@ -1286,7 +1286,7 @@ func TestOBS_RootLevelContent(t *testing.T) {
 		t.Error("ingredients/LICENSE.md should exist")
 	}
 
-	// Verify excluded files were NOT copied to ingredients/content/
+	// Verify excluded files were NOT copied to content/ ingredients
 	excludedKeys := []string{
 		"ingredients/content/LICENSE.md",
 		"ingredients/content/README.md",
@@ -1377,10 +1377,10 @@ func TestOBS_RootLevelContent_WithSubdirectories(t *testing.T) {
 
 	// Verify excluded files are not in content
 	if _, ok := metadata.Ingredients["ingredients/content/manifest.yaml"]; ok {
-		t.Error("manifest.yaml should not be in ingredients/content/")
+		t.Error("manifest.yaml should not be in content/ ingredients")
 	}
 	if _, ok := metadata.Ingredients["ingredients/content/LICENSE.md"]; ok {
-		t.Error("LICENSE.md should not be in ingredients/content/")
+		t.Error("LICENSE.md should not be in content/ ingredients")
 	}
 }
 
@@ -1393,13 +1393,13 @@ func TestOBS_RootLevelContent_ExcludesOnlyMetadataFiles(t *testing.T) {
 	// LICENSE.md, .gitignore, and dot-directories. Everything else is content.
 	os.WriteFile(filepath.Join(inDir, "01.md"), []byte("# Story 1\n"), 0644)
 	os.WriteFile(filepath.Join(inDir, "front.md"), []byte("# Front\n"), 0644)
-	os.WriteFile(filepath.Join(inDir, "notes.md"), []byte("notes"), 0644)      // should be included
-	os.WriteFile(filepath.Join(inDir, "extra.txt"), []byte("extra"), 0644)      // should be included
-	os.WriteFile(filepath.Join(inDir, "LICENSE.md"), []byte("License"), 0644)   // excluded
-	os.WriteFile(filepath.Join(inDir, "README.md"), []byte("# Readme"), 0644)  // excluded
-	os.WriteFile(filepath.Join(inDir, "manifest.yaml"), []byte("yaml"), 0644)  // excluded
-	os.WriteFile(filepath.Join(inDir, "media.yaml"), []byte("yaml"), 0644)     // excluded
-	os.WriteFile(filepath.Join(inDir, ".gitignore"), []byte("*.tmp\n"), 0644)  // excluded
+	os.WriteFile(filepath.Join(inDir, "notes.md"), []byte("notes"), 0644)     // should be included
+	os.WriteFile(filepath.Join(inDir, "extra.txt"), []byte("extra"), 0644)    // should be included
+	os.WriteFile(filepath.Join(inDir, "LICENSE.md"), []byte("License"), 0644) // excluded
+	os.WriteFile(filepath.Join(inDir, "README.md"), []byte("# Readme"), 0644) // excluded
+	os.WriteFile(filepath.Join(inDir, "manifest.yaml"), []byte("yaml"), 0644) // excluded
+	os.WriteFile(filepath.Join(inDir, "media.yaml"), []byte("yaml"), 0644)    // excluded
+	os.WriteFile(filepath.Join(inDir, ".gitignore"), []byte("*.tmp\n"), 0644) // excluded
 
 	// Dot-directory should be excluded
 	os.MkdirAll(filepath.Join(inDir, ".git"), 0755)
@@ -1452,7 +1452,7 @@ func TestOBS_RootLevelContent_ExcludesOnlyMetadataFiles(t *testing.T) {
 		}
 	}
 
-	// Files that should be excluded from ingredients/content/
+	// Files that should be excluded from content/ ingredients
 	excluded := []string{
 		"ingredients/content/manifest.yaml",
 		"ingredients/content/media.yaml",
