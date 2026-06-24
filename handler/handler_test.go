@@ -744,6 +744,208 @@ func TestTWL_CopiesRootFilesWithoutIngredientEntries(t *testing.T) {
 	}
 }
 
+// --- OBS TWL handler tests ---
+
+func writeOBSTWLManifest(t *testing.T, inDir string) *rc.Manifest {
+	t.Helper()
+	return &rc.Manifest{
+		DublinCore: rc.DublinCore{
+			Subject:    "TSV OBS Translation Words Links",
+			Identifier: "obs-twl",
+			Title:      "Test OBS TWL",
+			Issued:     "2024-01-01",
+			Publisher:  "test",
+			Rights:     "CC BY-SA 4.0",
+			Language: rc.Language{
+				Identifier: "en",
+				Title:      "English",
+				Direction:  "ltr",
+			},
+		},
+		Projects: []rc.Project{
+			{
+				Identifier: "obs",
+				Path:       "./twl_OBS.tsv",
+				Sort:       1,
+				Title:      "Open Bible Stories",
+			},
+		},
+	}
+}
+
+func TestOBSTWL_TypeAndIdentity(t *testing.T) {
+	inDir := t.TempDir()
+	outDir := t.TempDir()
+
+	manifest := writeOBSTWLManifest(t, inDir)
+	tsvContent := "Reference\tID\tTags\tOrigWords\tOccurrence\tTWLink\n" +
+		"1:1\tabcd\t\tword\t1\trc://*/tw/dict/bible/kt/god\n"
+	os.WriteFile(filepath.Join(inDir, "twl_OBS.tsv"), []byte(tsvContent), 0644)
+	os.WriteFile(filepath.Join(inDir, "LICENSE.md"), []byte("License"), 0644)
+
+	h, err := handler.Lookup("TSV OBS Translation Words Links")
+	if err != nil {
+		t.Fatalf("Lookup failed: %v", err)
+	}
+
+	metadata, err := h.Convert(context.Background(), manifest, inDir, outDir, handler.Options{})
+	if err != nil {
+		t.Fatalf("Convert failed: %v", err)
+	}
+
+	// parascriptural/x-bcvarticles, same flavor as the Bible TWL handler.
+	if got := metadata.Type.FlavorType.Name; got != "parascriptural" {
+		t.Errorf("FlavorType.Name = %q; want %q", got, "parascriptural")
+	}
+	if got := metadata.Type.FlavorType.Flavor.Name; got != "x-bcvarticles" {
+		t.Errorf("Flavor.Name = %q; want %q", got, "x-bcvarticles")
+	}
+
+	// OBS is the book — scope is keyed on the OBS book code.
+	if _, ok := metadata.Type.FlavorType.CurrentScope["OBS"]; !ok {
+		t.Errorf("CurrentScope missing OBS key; got %v", metadata.Type.FlavorType.CurrentScope)
+	}
+
+	// OBS localized name.
+	if _, ok := metadata.LocalizedNames["book-obs"]; !ok {
+		t.Error("LocalizedNames missing book-obs entry")
+	}
+
+	// BurritoTruck identity with the OBSTWL abbreviation.
+	if _, ok := metadata.IDAuthorities["BurritoTruck"]; !ok {
+		t.Errorf("IDAuthorities missing BurritoTruck; got %v", metadata.IDAuthorities)
+	}
+	if abbr := metadata.Identification.Abbreviation["en"]; abbr != "OBSTWL" {
+		t.Errorf("Abbreviation = %q; want %q", abbr, "OBSTWL")
+	}
+}
+
+func TestOBSTWL_AutoDetectsPayload(t *testing.T) {
+	inDir := t.TempDir()
+	outDir := t.TempDir()
+
+	manifest := writeOBSTWLManifest(t, inDir)
+	tsvContent := "Reference\tID\tTags\tOrigWords\tOccurrence\tTWLink\n" +
+		"1:1\tabcd\t\tword\t1\trc://*/tw/dict/bible/names/adam\n"
+	os.WriteFile(filepath.Join(inDir, "twl_OBS.tsv"), []byte(tsvContent), 0644)
+	os.WriteFile(filepath.Join(inDir, "LICENSE.md"), []byte("License"), 0644)
+
+	// Create the en_tw/bible/ directory (auto-detection target).
+	twBibleDir := filepath.Join(inDir, "en_tw", "bible", "names")
+	os.MkdirAll(twBibleDir, 0755)
+	os.WriteFile(filepath.Join(twBibleDir, "adam.md"), []byte("# Adam\n\nThe first man."), 0644)
+
+	h, err := handler.Lookup("TSV OBS Translation Words Links")
+	if err != nil {
+		t.Fatalf("Lookup failed: %v", err)
+	}
+
+	metadata, err := h.Convert(context.Background(), manifest, inDir, outDir, handler.Options{})
+	if err != nil {
+		t.Fatalf("Convert failed: %v", err)
+	}
+
+	// Payload from the TW repo was copied.
+	if _, ok := metadata.Ingredients["ingredients/payload/names/adam.md"]; !ok {
+		t.Error("Payload article ingredients/payload/names/adam.md not found; auto-detection failed")
+	}
+
+	// twl_ prefix stripped: twl_OBS.tsv -> ingredients/OBS.tsv, with links rewritten.
+	data, err := os.ReadFile(filepath.Join(outDir, "ingredients", "OBS.tsv"))
+	if err != nil {
+		t.Fatalf("Reading output TSV: %v", err)
+	}
+	content := string(data)
+	if strings.Contains(content, "rc://") {
+		t.Error("TSV still contains rc:// links after auto-detection rewrite")
+	}
+	if !strings.Contains(content, "./payload/names/adam.md") {
+		t.Error("TSV does not contain expected ./payload/names/adam.md path")
+	}
+}
+
+func TestOBSTWL_ExplicitPayloadPath(t *testing.T) {
+	inDir := t.TempDir()
+	outDir := t.TempDir()
+	payloadDir := t.TempDir() // Separate org/language Translation Words repo.
+
+	manifest := writeOBSTWLManifest(t, inDir)
+	tsvContent := "Reference\tID\tTags\tOrigWords\tOccurrence\tTWLink\n" +
+		"1:1\tabcd\t\tword\t1\trc://*/tw/dict/bible/kt/god\n"
+	os.WriteFile(filepath.Join(inDir, "twl_OBS.tsv"), []byte(tsvContent), 0644)
+	os.WriteFile(filepath.Join(inDir, "LICENSE.md"), []byte("License"), 0644)
+
+	twBibleDir := filepath.Join(payloadDir, "bible", "kt")
+	os.MkdirAll(twBibleDir, 0755)
+	os.WriteFile(filepath.Join(twBibleDir, "god.md"), []byte("# God\n\nThe creator."), 0644)
+
+	h, err := handler.Lookup("TSV OBS Translation Words Links")
+	if err != nil {
+		t.Fatalf("Lookup failed: %v", err)
+	}
+
+	opts := handler.Options{PayloadPath: payloadDir}
+	metadata, err := h.Convert(context.Background(), manifest, inDir, outDir, opts)
+	if err != nil {
+		t.Fatalf("Convert with PayloadPath failed: %v", err)
+	}
+
+	if _, ok := metadata.Ingredients["ingredients/payload/kt/god.md"]; !ok {
+		t.Error("Payload article ingredients/payload/kt/god.md not found; explicit PayloadPath failed")
+	}
+
+	data, err := os.ReadFile(filepath.Join(outDir, "ingredients", "OBS.tsv"))
+	if err != nil {
+		t.Fatalf("Reading output TSV: %v", err)
+	}
+	content := string(data)
+	if strings.Contains(content, "rc://") {
+		t.Error("TSV still contains rc:// links after PayloadPath rewrite")
+	}
+	if !strings.Contains(content, "./payload/kt/god.md") {
+		t.Error("TSV does not contain expected ./payload/kt/god.md path")
+	}
+}
+
+func TestOBSTWL_NoPayloadCopiesAsIs(t *testing.T) {
+	inDir := t.TempDir()
+	outDir := t.TempDir()
+
+	manifest := writeOBSTWLManifest(t, inDir)
+	tsvContent := "Reference\tID\tTags\tOrigWords\tOccurrence\tTWLink\n" +
+		"1:1\tabcd\t\tword\t1\trc://*/tw/dict/bible/names/adam\n"
+	os.WriteFile(filepath.Join(inDir, "twl_OBS.tsv"), []byte(tsvContent), 0644)
+	os.WriteFile(filepath.Join(inDir, "LICENSE.md"), []byte("License"), 0644)
+
+	h, err := handler.Lookup("TSV OBS Translation Words Links")
+	if err != nil {
+		t.Fatalf("Lookup failed: %v", err)
+	}
+
+	metadata, err := h.Convert(context.Background(), manifest, inDir, outDir, handler.Options{})
+	if err != nil {
+		t.Fatalf("Convert without payload failed: %v", err)
+	}
+
+	for key := range metadata.Ingredients {
+		if strings.HasPrefix(key, "ingredients/payload/") {
+			t.Errorf("Unexpected payload ingredient %s when no TW directory exists", key)
+		}
+	}
+
+	data, err := os.ReadFile(filepath.Join(outDir, "ingredients", "OBS.tsv"))
+	if err != nil {
+		t.Fatalf("Reading output TSV: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "rc://") {
+		t.Error("TSV should preserve rc:// links when no payload exists")
+	}
+	if strings.Contains(content, "./payload/") {
+		t.Error("TSV should NOT contain ./payload/ paths when no payload exists")
+	}
+}
+
 func TestTA_DoesNotCopyManifestOrMediaToRoot(t *testing.T) {
 	inDir := t.TempDir()
 	outDir := t.TempDir()
@@ -885,6 +1087,7 @@ func TestLookup_AllRegisteredSubjects(t *testing.T) {
 		"TSV OBS Study Questions",
 		"TSV OBS Translation Notes",
 		"TSV OBS Translation Questions",
+		"TSV OBS Translation Words Links",
 	}
 
 	for _, subject := range expectedSubjects {
@@ -902,8 +1105,8 @@ func TestLookup_AllRegisteredSubjects(t *testing.T) {
 
 func TestSupportedSubjects_Count(t *testing.T) {
 	subjects := handler.SupportedSubjects()
-	if len(subjects) != 14 {
-		t.Errorf("SupportedSubjects() returned %d subjects; want 14. Got: %v", len(subjects), subjects)
+	if len(subjects) != 15 {
+		t.Errorf("SupportedSubjects() returned %d subjects; want 15. Got: %v", len(subjects), subjects)
 	}
 }
 

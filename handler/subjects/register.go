@@ -58,4 +58,8 @@ func init() {
 		"OBSTQ",
 		"tq_",
 	))
+
+	// TSV OBS Translation Words Links — TWL-style payload + rc:// link rewriting
+	// (parascriptural/x-bcvarticles), but with OBS treated as a single book.
+	handler.Register(handler.NewOBSTWLHandler())
 }
