@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/unfoldingWord/go-rc2sb/rc"
@@ -84,11 +85,31 @@ func (h *obsHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, 
 
 	m := BuildBaseMetadata(manifest, "BurritoTruck", "OBS")
 
-	// Build currentScope as union of all OBS story scopes
+	// Build currentScope as the deduplicated union of all OBS story scopes.
+	// The SB scope schema requires each book's reference array to have unique
+	// items (oneOf: non-empty array with uniqueItems, or empty array), so the
+	// same reference contributed by multiple stories (e.g. 2SA "7" from stories
+	// 17, 21, and 48) must appear only once. Stories are iterated in sorted
+	// order so the resulting reference order is deterministic across runs.
 	currentScope := make(map[string][]string)
-	for _, scope := range obsStoryScopes {
-		for book, refs := range scope {
-			currentScope[book] = append(currentScope[book], refs...)
+	seen := make(map[string]map[string]bool) // book -> ref -> already added
+	storyNums := make([]string, 0, len(obsStoryScopes))
+	for num := range obsStoryScopes {
+		storyNums = append(storyNums, num)
+	}
+	sort.Strings(storyNums)
+	for _, num := range storyNums {
+		for book, refs := range obsStoryScopes[num] {
+			if seen[book] == nil {
+				seen[book] = make(map[string]bool)
+			}
+			for _, ref := range refs {
+				if seen[book][ref] {
+					continue
+				}
+				seen[book][ref] = true
+				currentScope[book] = append(currentScope[book], ref)
+			}
 		}
 	}
 

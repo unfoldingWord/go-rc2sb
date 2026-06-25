@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -1066,6 +1067,88 @@ func TestOBS_DoesNotCopyManifestOrMediaToRoot(t *testing.T) {
 	}
 	if _, ok := metadata.Ingredients["ingredients/LICENSE.md"]; !ok {
 		t.Error("ingredients/LICENSE.md should exist in OBS metadata ingredients")
+	}
+}
+
+// TestOBS_CurrentScopeIsSchemaValid verifies that the OBS currentScope, built as
+// the union of all per-story scopes, satisfies the Scripture Burrito scope schema
+// (https://burrito.bible/schema/scope.schema.json): every book's reference array
+// must have unique items and each reference must match the scope verse pattern.
+// Regression test for duplicate references — e.g. 2SA "7" is contributed by
+// stories 17, 21, and 48 — which made metadata.json fail schema validation
+// ("oneOf failed: items at index 0 and 2 are equal").
+func TestOBS_CurrentScopeIsSchemaValid(t *testing.T) {
+	inDir := t.TempDir()
+	outDir := t.TempDir()
+
+	manifest := &rc.Manifest{
+		DublinCore: rc.DublinCore{
+			Subject:    "Open Bible Stories",
+			Identifier: "obs",
+			Title:      "Test OBS",
+			Issued:     "2024-01-01",
+			Publisher:  "test",
+			Rights:     "CC BY-SA 4.0",
+			Version:    "1",
+			Language: rc.Language{
+				Identifier: "en",
+				Title:      "English",
+				Direction:  "ltr",
+			},
+		},
+	}
+
+	if err := os.MkdirAll(filepath.Join(inDir, "content"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(inDir, "content", "01.md"), []byte("# Story"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	h, err := handler.Lookup("Open Bible Stories")
+	if err != nil {
+		t.Fatalf("Lookup failed: %v", err)
+	}
+
+	metadata, err := h.Convert(context.Background(), manifest, inDir, outDir, handler.Options{})
+	if err != nil {
+		t.Fatalf("Convert failed: %v", err)
+	}
+
+	scope := metadata.Type.FlavorType.CurrentScope
+	if len(scope) == 0 {
+		t.Fatal("currentScope is empty")
+	}
+
+	// Reference pattern from scope.schema.json: single chapter, chapter range,
+	// chapter:verse(-verse), or chapter:verse-chapter:verse (no leading zeros).
+	refPattern := regexp.MustCompile(`^[1-9][0-9]*$|^[1-9][0-9]*-[1-9][0-9]*$|^[1-9][0-9]*:[1-9][0-9]*(-[1-9][0-9]*)?$|^[1-9][0-9]*:[1-9][0-9]*-[1-9][0-9]*:[1-9][0-9]*$`)
+
+	for book, refs := range scope {
+		if len(refs) == 0 {
+			t.Errorf("book %q has an empty reference array; OBS scopes always have references", book)
+		}
+		seen := make(map[string]bool, len(refs))
+		for _, ref := range refs {
+			if seen[ref] {
+				t.Errorf("book %q has duplicate reference %q (violates schema uniqueItems): %v", book, ref, refs)
+			}
+			seen[ref] = true
+			if !refPattern.MatchString(ref) {
+				t.Errorf("book %q reference %q does not match the SB scope pattern", book, ref)
+			}
+		}
+	}
+
+	// Explicit regression check: 2SA "7" comes from three stories but must appear once.
+	count := 0
+	for _, ref := range scope["2SA"] {
+		if ref == "7" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("2SA should contain \"7\" exactly once, got %d occurrences: %v", count, scope["2SA"])
 	}
 }
 
