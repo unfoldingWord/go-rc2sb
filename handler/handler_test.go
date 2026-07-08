@@ -1644,13 +1644,13 @@ func TestOBS_RootLevelContent_WithSubdirectories(t *testing.T) {
 		t.Fatalf("Convert failed: %v", err)
 	}
 
-	// Verify stories and subdirectory files are all present
+	// Verify stories are present and front/back intros are flattened to
+	// front.md and back.md.
 	expectedContent := []string{
 		"ingredients/content/01.md",
 		"ingredients/content/02.md",
-		"ingredients/content/front/intro.md",
-		"ingredients/content/front/title.md",
-		"ingredients/content/back/intro.md",
+		"ingredients/content/front.md",
+		"ingredients/content/back.md",
 	}
 	for _, key := range expectedContent {
 		if _, ok := metadata.Ingredients[key]; !ok {
@@ -1659,6 +1659,29 @@ func TestOBS_RootLevelContent_WithSubdirectories(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(outDir, key)); os.IsNotExist(err) {
 			t.Errorf("Expected file %s not found on disk", key)
 		}
+	}
+
+	// The front/ and back/ directories must not be recreated in the output.
+	notExpected := []string{
+		"ingredients/content/front/intro.md",
+		"ingredients/content/front/title.md",
+		"ingredients/content/back/intro.md",
+	}
+	for _, key := range notExpected {
+		if _, ok := metadata.Ingredients[key]; ok {
+			t.Errorf("Ingredient %s should not exist", key)
+		}
+		if _, err := os.Stat(filepath.Join(outDir, key)); err == nil {
+			t.Errorf("File %s should not exist on disk", key)
+		}
+	}
+
+	// front/title.md feeds name and description instead of being copied.
+	if got := metadata.Identification.Name["en"]; got != "# Title" {
+		t.Errorf("Name[en] = %q; want %q", got, "# Title")
+	}
+	if got := metadata.Identification.Description["en"]; got != "# Title" {
+		t.Errorf("Description[en] = %q; want %q", got, "# Title")
 	}
 
 	// Verify excluded files are not in content
@@ -1670,17 +1693,17 @@ func TestOBS_RootLevelContent_WithSubdirectories(t *testing.T) {
 	}
 }
 
-func TestOBS_RootLevelContent_ExcludesOnlyMetadataFiles(t *testing.T) {
+func TestOBS_RootLevelContent_OnlyStoriesAndFrontBack(t *testing.T) {
 	inDir := t.TempDir()
 	outDir := t.TempDir()
 
 	// Create OBS content plus various file types in root.
-	// The exclusion-based approach should only exclude *.yaml, README.md,
-	// LICENSE.md, .gitignore, and dot-directories. Everything else is content.
+	// Only the story files 01.md-50.md, front.md, and back.md are content;
+	// everything else must be left out of ingredients/content/.
 	os.WriteFile(filepath.Join(inDir, "01.md"), []byte("# Story 1\n"), 0644)
 	os.WriteFile(filepath.Join(inDir, "front.md"), []byte("# Front\n"), 0644)
-	os.WriteFile(filepath.Join(inDir, "notes.md"), []byte("notes"), 0644)     // should be included
-	os.WriteFile(filepath.Join(inDir, "extra.txt"), []byte("extra"), 0644)    // should be included
+	os.WriteFile(filepath.Join(inDir, "notes.md"), []byte("notes"), 0644)     // excluded
+	os.WriteFile(filepath.Join(inDir, "extra.txt"), []byte("extra"), 0644)    // excluded
 	os.WriteFile(filepath.Join(inDir, "LICENSE.md"), []byte("License"), 0644) // excluded
 	os.WriteFile(filepath.Join(inDir, "README.md"), []byte("# Readme"), 0644) // excluded
 	os.WriteFile(filepath.Join(inDir, "manifest.yaml"), []byte("yaml"), 0644) // excluded
@@ -1729,8 +1752,6 @@ func TestOBS_RootLevelContent_ExcludesOnlyMetadataFiles(t *testing.T) {
 	included := []string{
 		"ingredients/content/01.md",
 		"ingredients/content/front.md",
-		"ingredients/content/notes.md",
-		"ingredients/content/extra.txt",
 	}
 	for _, key := range included {
 		if _, ok := metadata.Ingredients[key]; !ok {
@@ -1740,6 +1761,8 @@ func TestOBS_RootLevelContent_ExcludesOnlyMetadataFiles(t *testing.T) {
 
 	// Files that should be excluded from content/ ingredients
 	excluded := []string{
+		"ingredients/content/notes.md",
+		"ingredients/content/extra.txt",
 		"ingredients/content/manifest.yaml",
 		"ingredients/content/media.yaml",
 		"ingredients/content/README.md",
@@ -1807,15 +1830,134 @@ func TestOBS_ContentSubdirectory_StillWorks(t *testing.T) {
 		t.Fatalf("Convert failed: %v", err)
 	}
 
-	// Verify standard content/ path still works with subdirectories
+	// Verify standard content/ path still works: front/intro.md and
+	// back/intro.md are flattened to front.md and back.md.
 	expected := []string{
 		"ingredients/content/01.md",
-		"ingredients/content/front/intro.md",
-		"ingredients/content/back/intro.md",
+		"ingredients/content/front.md",
+		"ingredients/content/back.md",
 	}
 	for _, key := range expected {
 		if _, ok := metadata.Ingredients[key]; !ok {
 			t.Errorf("%s should exist for ./content path", key)
 		}
+	}
+	notExpected := []string{
+		"ingredients/content/front/intro.md",
+		"ingredients/content/back/intro.md",
+	}
+	for _, key := range notExpected {
+		if _, ok := metadata.Ingredients[key]; ok {
+			t.Errorf("%s should not exist for ./content path", key)
+		}
+	}
+}
+
+// obsManifestForTitleTest builds a minimal OBS manifest with the given language.
+func obsManifestForTitleTest(langID, langTitle string) *rc.Manifest {
+	return &rc.Manifest{
+		DublinCore: rc.DublinCore{
+			Subject:    "Open Bible Stories",
+			Identifier: "obs",
+			Title:      "Open Bible Stories",
+			Issued:     "2024-01-01",
+			Publisher:  "test",
+			Rights:     "CC BY-SA 4.0",
+			Language: rc.Language{
+				Identifier: langID,
+				Title:      langTitle,
+				Direction:  "ltr",
+			},
+		},
+		Projects: []rc.Project{
+			{
+				Identifier: "obs",
+				Path:       "./content",
+				Sort:       0,
+				Title:      "Open Bible Stories",
+			},
+		},
+	}
+}
+
+func TestOBS_NameAndDescriptionFromTitle(t *testing.T) {
+	cases := []struct {
+		name     string
+		langID   string
+		title    string // contents of content/front/title.md; "" means no file
+		wantName map[string]string
+	}{
+		{
+			name:     "non-English with title.md",
+			langID:   "fr",
+			title:    "Histoires Bibliques Ouvertes\n",
+			wantName: map[string]string{"fr": "Histoires Bibliques Ouvertes", "en": "Open Bible Stories"},
+		},
+		{
+			name:     "English with title.md",
+			langID:   "en",
+			title:    "unfoldingWord® Open Bible Stories\n",
+			wantName: map[string]string{"en": "unfoldingWord® Open Bible Stories"},
+		},
+		{
+			name:     "English without title.md",
+			langID:   "en",
+			title:    "",
+			wantName: map[string]string{"en": "Open Bible Stories"},
+		},
+		{
+			name:     "non-English without title.md",
+			langID:   "fr",
+			title:    "",
+			wantName: map[string]string{"en": "Open Bible Stories"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			inDir := t.TempDir()
+			outDir := t.TempDir()
+
+			os.MkdirAll(filepath.Join(inDir, "content"), 0755)
+			os.WriteFile(filepath.Join(inDir, "content", "01.md"), []byte("# Story 1\n"), 0644)
+			if tc.title != "" {
+				os.MkdirAll(filepath.Join(inDir, "content", "front"), 0755)
+				os.WriteFile(filepath.Join(inDir, "content", "front", "title.md"), []byte(tc.title), 0644)
+			}
+
+			h, err := handler.Lookup("Open Bible Stories")
+			if err != nil {
+				t.Fatalf("Lookup failed: %v", err)
+			}
+
+			manifest := obsManifestForTitleTest(tc.langID, tc.langID)
+			metadata, err := h.Convert(context.Background(), manifest, inDir, outDir, handler.Options{})
+			if err != nil {
+				t.Fatalf("Convert failed: %v", err)
+			}
+
+			for _, field := range []struct {
+				label string
+				got   map[string]string
+			}{
+				{"Name", metadata.Identification.Name},
+				{"Description", metadata.Identification.Description},
+			} {
+				if len(field.got) != len(tc.wantName) {
+					t.Errorf("%s = %v; want %v", field.label, field.got, tc.wantName)
+					continue
+				}
+				for lang, want := range tc.wantName {
+					if field.got[lang] != want {
+						t.Errorf("%s[%s] = %q; want %q", field.label, lang, field.got[lang], want)
+					}
+				}
+			}
+
+			// title.md must never appear as an ingredient.
+			if _, ok := metadata.Ingredients["ingredients/content/front/title.md"]; ok {
+				t.Error("front/title.md should not be an ingredient")
+			}
+		})
 	}
 }

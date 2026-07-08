@@ -147,20 +147,34 @@ func (h *obsHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, 
 			contentPath = p
 		}
 	}
+	contentDir := inDir
+	if contentPath != "." {
+		contentDir = filepath.Join(inDir, contentPath)
+	}
 
-	if contentPath == "." {
-		// Content lives in the repo root — copy everything except known
-		// non-content files (manifest.yaml, media.yaml, README.md, LICENSE.md,
-		// .gitignore, and dot-directories like .git, .gitea, .github).
-		if err := copyOBSRootContent(inDir, outDir, m); err != nil {
-			return nil, err
-		}
-	} else {
-		// Content lives in a subdirectory — copy everything in it.
-		contentDir := filepath.Join(inDir, contentPath)
-		if err := copyContentDir(contentDir, outDir, m); err != nil {
-			return nil, err
-		}
+	// Set name and description from front/title.md when present. The RC
+	// language gets the title text; English is always present, falling back
+	// to "Open Bible Stories" when the title doesn't provide it.
+	title, err := readOBSTitle(contentDir)
+	if err != nil {
+		return nil, err
+	}
+	nameMap := make(map[string]string)
+	if title != "" {
+		nameMap[manifest.DublinCore.Language.Identifier] = title
+	}
+	if _, ok := nameMap["en"]; !ok {
+		nameMap["en"] = "Open Bible Stories"
+	}
+	descMap := make(map[string]string, len(nameMap))
+	for k, v := range nameMap {
+		descMap[k] = v
+	}
+	m.Identification.Name = nameMap
+	m.Identification.Description = descMap
+
+	if err := copyOBSContent(contentDir, outDir, m); err != nil {
+		return nil, err
 	}
 
 	// Copy LICENSE.md to ingredients/LICENSE.md (uses embedded default if RC doesn't have one).
@@ -173,138 +187,75 @@ func (h *obsHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, 
 	return m, nil
 }
 
-// copyContentDir recursively copies content files to ingredients/content/.
-func copyContentDir(contentDir, outDir string, m *sb.Metadata) error {
-	return filepath.Walk(contentDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-
-		relPath, err := filepath.Rel(contentDir, path)
-		if err != nil {
-			return err
-		}
-
-		ingredientKey := "ingredients/content/" + filepath.ToSlash(relPath)
-		storyNum := strings.TrimSuffix(filepath.Base(relPath), ".md")
-
-		if scope, ok := obsStoryScopes[storyNum]; ok {
-			ing, err := CopyFileWithScope(path, outDir, ingredientKey, scope)
-			if err != nil {
-				return fmt.Errorf("copying content file %s: %w", relPath, err)
+// copyOBSContent copies OBS content into ingredients/content/. Only the story
+// files 01.md-50.md plus front.md and back.md are copied; everything else in
+// the content directory (front/title.md, config files, etc.) is skipped.
+// front.md is sourced from front/intro.md (or a flat front.md), and back.md
+// from back/intro.md (or a flat back.md) — the front/ and back/ directories
+// themselves are never recreated in the output.
+func copyOBSContent(contentDir, outDir string, m *sb.Metadata) error {
+	// Story files 01.md-50.md, each with its fixed Bible reference scope.
+	storyNums := make([]string, 0, len(obsStoryScopes))
+	for num := range obsStoryScopes {
+		storyNums = append(storyNums, num)
+	}
+	sort.Strings(storyNums)
+	for _, num := range storyNums {
+		name := num + ".md"
+		src := filepath.Join(contentDir, name)
+		if _, err := os.Stat(src); err != nil {
+			if os.IsNotExist(err) {
+				continue
 			}
-			m.Ingredients[ingredientKey] = ing
-		} else {
-			ing, err := CopyFileAndComputeIngredient(path, outDir, ingredientKey)
-			if err != nil {
-				return fmt.Errorf("copying content file %s: %w", relPath, err)
-			}
-			m.Ingredients[ingredientKey] = ing
+			return fmt.Errorf("checking content file %s: %w", name, err)
 		}
-
-		return nil
-	})
-}
-
-// copyOBSRootContent copies OBS content from the repo root when the manifest
-// project path is ".". It copies all files and directories except known
-// non-content entries: *.yaml files, README.md, LICENSE.md, .gitignore,
-// and dot-directories (.git, .gitea, .github). This handles both flat layouts
-// (numbered .md files, front.md, back.md) and layouts with subdirectories
-// (front/, back/).
-func copyOBSRootContent(inDir, outDir string, m *sb.Metadata) error {
-	entries, err := os.ReadDir(inDir)
-	if err != nil {
-		return fmt.Errorf("reading OBS root directory: %w", err)
+		ingredientKey := "ingredients/content/" + name
+		ing, err := CopyFileWithScope(src, outDir, ingredientKey, obsStoryScopes[num])
+		if err != nil {
+			return fmt.Errorf("copying content file %s: %w", name, err)
+		}
+		m.Ingredients[ingredientKey] = ing
 	}
 
-	for _, entry := range entries {
-		name := entry.Name()
-
-		if isOBSExcludedEntry(name, entry.IsDir()) {
-			continue
+	// front.md and back.md, flattened from front/intro.md and back/intro.md.
+	for _, section := range []string{"front", "back"} {
+		candidates := []string{
+			filepath.Join(contentDir, section, "intro.md"),
+			filepath.Join(contentDir, section+".md"),
 		}
-
-		srcPath := filepath.Join(inDir, name)
-
-		if entry.IsDir() {
-			// Recursively copy the subdirectory into ingredients/content/{dir}/
-			// We walk the subdirectory and prefix each relative path with the
-			// directory name so that e.g. front/intro.md maps to
-			// content/front/intro.md.
-			if err := copyOBSSubdir(srcPath, name, outDir, m); err != nil {
-				return fmt.Errorf("copying OBS content directory %s: %w", name, err)
-			}
-		} else {
-			ingredientKey := "ingredients/content/" + name
-			storyNum := strings.TrimSuffix(name, ".md")
-			if scope, ok := obsStoryScopes[storyNum]; ok {
-				ing, err := CopyFileWithScope(srcPath, outDir, ingredientKey, scope)
-				if err != nil {
-					return fmt.Errorf("copying OBS content file %s: %w", name, err)
+		for _, src := range candidates {
+			info, err := os.Stat(src)
+			if err != nil {
+				if os.IsNotExist(err) {
+					continue
 				}
-				m.Ingredients[ingredientKey] = ing
-			} else {
-				ing, err := CopyFileAndComputeIngredient(srcPath, outDir, ingredientKey)
-				if err != nil {
-					return fmt.Errorf("copying OBS content file %s: %w", name, err)
-				}
-				m.Ingredients[ingredientKey] = ing
+				return fmt.Errorf("checking %s content: %w", section, err)
 			}
+			if info.IsDir() {
+				continue
+			}
+			ingredientKey := "ingredients/content/" + section + ".md"
+			ing, err := CopyFileAndComputeIngredient(src, outDir, ingredientKey)
+			if err != nil {
+				return fmt.Errorf("copying %s content: %w", section, err)
+			}
+			m.Ingredients[ingredientKey] = ing
+			break
 		}
 	}
 
 	return nil
 }
 
-// copyOBSSubdir recursively copies a subdirectory from the OBS root into
-// ingredients/content/{dirName}/. For example, a file front/intro.md is
-// copied to ingredients/content/front/intro.md.
-func copyOBSSubdir(srcDir, dirName, outDir string, m *sb.Metadata) error {
-	return filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+// readOBSTitle returns the trimmed contents of front/title.md in the content
+// directory, or "" if the file does not exist.
+func readOBSTitle(contentDir string) (string, error) {
+	data, err := os.ReadFile(filepath.Join(contentDir, "front", "title.md"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
 		}
-		if info.IsDir() {
-			return nil
-		}
-
-		relPath, err := filepath.Rel(srcDir, path)
-		if err != nil {
-			return err
-		}
-
-		ingredientKey := "ingredients/content/" + dirName + "/" + filepath.ToSlash(relPath)
-
-		ing, err := CopyFileAndComputeIngredient(path, outDir, ingredientKey)
-		if err != nil {
-			return fmt.Errorf("copying %s/%s: %w", dirName, relPath, err)
-		}
-		m.Ingredients[ingredientKey] = ing
-
-		return nil
-	})
-}
-
-// isOBSExcludedEntry returns true if the given root-level entry should be
-// excluded from OBS content copying. Excluded entries are repository metadata
-// and infrastructure files that are not part of the OBS content itself.
-func isOBSExcludedEntry(name string, isDir bool) bool {
-	if isDir {
-		// Exclude dot-directories (.git, .gitea, .github, etc.)
-		return strings.HasPrefix(name, ".")
+		return "", fmt.Errorf("reading front/title.md: %w", err)
 	}
-	// Exclude YAML metadata files
-	if strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".yml") {
-		return true
-	}
-	// Exclude known root-level non-content files
-	switch name {
-	case "README.md", "LICENSE.md", ".gitignore":
-		return true
-	}
-	return false
+	return strings.TrimSpace(string(data)), nil
 }
