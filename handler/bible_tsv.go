@@ -12,31 +12,39 @@ import (
 	"github.com/unfoldingWord/go-rc2sb/sb"
 )
 
-// NewTQHandler creates a new TSV Translation Questions handler.
-func NewTQHandler() Handler {
-	return &tqHandler{}
+// bibleTSVConfig holds the configuration for a Bible-based TSV variant
+// (one TSV file per Bible book, e.g. tn_GEN.tsv).
+type bibleTSVConfig struct {
+	subject      string // e.g., "TSV Translation Notes"
+	flavorName   string // e.g., "x-bcvnotes"
+	abbreviation string // e.g., "TN"
+	tsvPrefix    string // e.g., "tn_"
 }
 
-type tqHandler struct{}
-
-func (h *tqHandler) Subject() string {
-	return "TSV Translation Questions"
+// bibleTSVHandler handles conversion for Bible-based TSV variants:
+// Translation Notes, Translation Questions, Study Notes, and Study Questions.
+type bibleTSVHandler struct {
+	config bibleTSVConfig
 }
 
-func (h *tqHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, outDir string, opts Options) (*sb.Metadata, error) {
+func (h *bibleTSVHandler) Subject() string {
+	return h.config.subject
+}
+
+func (h *bibleTSVHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, outDir string, opts Options) (*sb.Metadata, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
-	m := BuildBaseMetadata(manifest, "uWBurritos", "TQ")
+	m := BuildBaseMetadata(manifest, "uWBurritos", h.config.abbreviation)
 
-	// Set type - parascriptural/x-bcvquestions
+	// Set type - parascriptural with the variant's flavor
 	currentScope := make(map[string][]string)
 	m.Type = sb.Type{
 		FlavorType: sb.FlavorType{
 			Name: "parascriptural",
 			Flavor: sb.Flavor{
-				Name: "x-bcvquestions",
+				Name: h.config.flavorName,
 			},
 		},
 	}
@@ -57,8 +65,8 @@ func (h *tqHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, o
 		}
 		srcFilename := filepath.Base(srcPath)
 
-		// Strip "tq_" prefix: "tq_GEN.tsv" -> "GEN.tsv"
-		destFilename := strings.TrimPrefix(srcFilename, "tq_")
+		// Strip the variant prefix: "tn_GEN.tsv" -> "GEN.tsv"
+		destFilename := strings.TrimPrefix(srcFilename, h.config.tsvPrefix)
 		ingredientKey := "ingredients/" + destFilename
 
 		// Get book code for scope
@@ -104,4 +112,16 @@ func (h *tqHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, o
 	m.Ingredients["ingredients/LICENSE.md"] = licIng
 
 	return m, nil
+}
+
+// NewBibleTSVHandler creates a new handler for a Bible-based TSV variant.
+func NewBibleTSVHandler(subject, flavorName, abbreviation, tsvPrefix string) Handler {
+	return &bibleTSVHandler{
+		config: bibleTSVConfig{
+			subject:      subject,
+			flavorName:   flavorName,
+			abbreviation: abbreviation,
+			tsvPrefix:    tsvPrefix,
+		},
+	}
 }

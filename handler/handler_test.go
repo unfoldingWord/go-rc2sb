@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"testing"
 
@@ -1165,6 +1166,8 @@ func TestLookup_AllRegisteredSubjects(t *testing.T) {
 		"Translation Academy",
 		"TSV Translation Notes",
 		"TSV Translation Questions",
+		"TSV Study Notes",
+		"TSV Study Questions",
 		"TSV Translation Words Links",
 		"TSV OBS Study Notes",
 		"TSV OBS Study Questions",
@@ -1188,8 +1191,8 @@ func TestLookup_AllRegisteredSubjects(t *testing.T) {
 
 func TestSupportedSubjects_Count(t *testing.T) {
 	subjects := handler.SupportedSubjects()
-	if len(subjects) != 15 {
-		t.Errorf("SupportedSubjects() returned %d subjects; want 15. Got: %v", len(subjects), subjects)
+	if len(subjects) != 17 {
+		t.Errorf("SupportedSubjects() returned %d subjects; want 17. Got: %v", len(subjects), subjects)
 	}
 }
 
@@ -1960,4 +1963,108 @@ func TestOBS_NameAndDescriptionFromTitle(t *testing.T) {
 			}
 		})
 	}
+}
+
+// --- Bible TSV variant tests (TN, TQ, SN, SQ share one handler) ---
+
+func TestBibleTSV_AllVariants(t *testing.T) {
+	cases := []struct {
+		subject    string
+		identifier string
+		abbrev     string
+		flavor     string
+		prefix     string
+	}{
+		{"TSV Translation Notes", "tn", "TN", "x-bcvnotes", "tn_"},
+		{"TSV Translation Questions", "tq", "TQ", "x-bcvquestions", "tq_"},
+		{"TSV Study Notes", "sn", "SN", "x-bcvnotes", "sn_"},
+		{"TSV Study Questions", "sq", "SQ", "x-bcvquestions", "sq_"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.subject, func(t *testing.T) {
+			inDir := t.TempDir()
+			outDir := t.TempDir()
+
+			tsvName := tc.prefix + "GEN.tsv"
+			tsvContent := "Reference\tID\tTags\tQuote\tOccurrence\tNote\n1:1\tabcd\t\tword\t1\tA note\n"
+			os.WriteFile(filepath.Join(inDir, tsvName), []byte(tsvContent), 0644)
+			os.WriteFile(filepath.Join(inDir, "LICENSE.md"), []byte("License"), 0644)
+
+			manifest := &rc.Manifest{
+				DublinCore: rc.DublinCore{
+					Subject:    tc.subject,
+					Identifier: tc.identifier,
+					Title:      "Test " + tc.abbrev,
+					Issued:     "2024-01-01",
+					Publisher:  "test",
+					Rights:     "CC BY-SA 4.0",
+					Language: rc.Language{
+						Identifier: "en",
+						Title:      "English",
+						Direction:  "ltr",
+					},
+				},
+				Projects: []rc.Project{
+					{
+						Identifier: "gen",
+						Path:       "./" + tsvName,
+						Sort:       1,
+						Title:      "Genesis",
+					},
+				},
+			}
+
+			h, err := handler.Lookup(tc.subject)
+			if err != nil {
+				t.Fatalf("Lookup failed: %v", err)
+			}
+			if h.Subject() != tc.subject {
+				t.Errorf("Subject() = %q; want %q", h.Subject(), tc.subject)
+			}
+
+			metadata, err := h.Convert(context.Background(), manifest, inDir, outDir, handler.Options{})
+			if err != nil {
+				t.Fatalf("Convert failed: %v", err)
+			}
+
+			if metadata.Type.FlavorType.Name != "parascriptural" {
+				t.Errorf("FlavorType.Name = %q; want %q", metadata.Type.FlavorType.Name, "parascriptural")
+			}
+			if metadata.Type.FlavorType.Flavor.Name != tc.flavor {
+				t.Errorf("Flavor.Name = %q; want %q", metadata.Type.FlavorType.Flavor.Name, tc.flavor)
+			}
+			if got := metadata.Identification.Abbreviation["en"]; got != tc.abbrev {
+				t.Errorf("Abbreviation[en] = %q; want %q", got, tc.abbrev)
+			}
+
+			// The variant prefix is stripped from the ingredient filename.
+			if _, ok := metadata.Ingredients["ingredients/GEN.tsv"]; !ok {
+				t.Errorf("ingredients/GEN.tsv not found; ingredients: %v", ingredientKeys(metadata))
+			}
+			if _, ok := metadata.Ingredients["ingredients/"+tsvName]; ok {
+				t.Errorf("ingredients/%s should not exist (prefix not stripped)", tsvName)
+			}
+
+			// Per-book scope is set.
+			if _, ok := metadata.Type.FlavorType.CurrentScope["GEN"]; !ok {
+				t.Errorf("currentScope missing GEN; got %v", metadata.Type.FlavorType.CurrentScope)
+			}
+
+			// Localized name for the book is present.
+			if _, ok := metadata.LocalizedNames["book-gen"]; !ok {
+				t.Error("localizedNames missing book-gen")
+			}
+		})
+	}
+}
+
+// ingredientKeys returns the sorted ingredient keys of a metadata for error messages.
+func ingredientKeys(m *sb.Metadata) []string {
+	keys := make([]string, 0, len(m.Ingredients))
+	for k := range m.Ingredients {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }

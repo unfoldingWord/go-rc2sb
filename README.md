@@ -138,20 +138,23 @@ type Result struct {
 
 | Subject | SB Flavor Type | Notes |
 |---------|---------------|-------|
-| Open Bible Stories | gloss/textStories | Copies content/ to ingredients/content/ |
+| Open Bible Stories | gloss/textStories | Copies story files 01.md-50.md plus front.md/back.md; front/title.md becomes name/description |
 | Aligned Bible | scripture/textTranslation | Strips numeric prefix from USFM filenames; abbreviation from RC identifier |
 | Bible | scripture/textTranslation | Same as Aligned Bible (e.g., ULT, UST) |
 | Hebrew Old Testament | scripture/textTranslation | Same as Aligned Bible (e.g., UHB) |
 | Greek New Testament | scripture/textTranslation | Same as Aligned Bible (e.g., UGNT) |
-| Translation Words | peripheral/x-peripheralArticles | Copies bible/{kt,other,names}/ articles |
+| Translation Words | parascriptural/x-bcvarticles | Copies bible/ to ingredients/payload/; auto-detects `<lang>_twl/` for TSV ingredients |
 | Translation Academy | peripheral/x-peripheralArticles | Copies nested markdown hierarchy |
 | TSV Translation Notes | parascriptural/x-bcvnotes | Strips tn_ prefix from TSV filenames |
 | TSV Translation Questions | parascriptural/x-bcvquestions | Strips tq_ prefix from TSV filenames |
+| TSV Study Notes | parascriptural/x-bcvnotes | Strips sn_ prefix from TSV filenames |
+| TSV Study Questions | parascriptural/x-bcvquestions | Strips sq_ prefix from TSV filenames |
 | TSV Translation Words Links | parascriptural/x-bcvarticles | Auto-detects `<lang>_tw/` for payload; rewrites rc:// links |
 | TSV OBS Study Notes | peripheral/x-obsnotes | Single TSV file conversion |
 | TSV OBS Study Questions | peripheral/x-obsquestions | Single TSV file conversion |
 | TSV OBS Translation Notes | peripheral/x-obsnotes | Single TSV file conversion |
 | TSV OBS Translation Questions | peripheral/x-obsquestions | Single TSV file conversion |
+| TSV OBS Translation Words Links | parascriptural/x-bcvarticles | TWL-style payload and rc:// rewriting; OBS as a single book |
 
 ## Error Handling
 
@@ -224,10 +227,10 @@ go-rc2sb/
 |   +-- aligned_bible.go    # Bible/USFM handler (Aligned Bible, Bible, Hebrew OT, Greek NT)
 |   +-- tw.go               # Translation Words
 |   +-- ta.go               # Translation Academy
-|   +-- tn.go               # TSV Translation Notes
-|   +-- tq.go               # TSV Translation Questions
+|   +-- bible_tsv.go        # Bible TSV variants (TN, TQ, SN, SQ)
 |   +-- twl.go              # TSV Translation Words Links (with payload)
 |   +-- obs_tsv.go          # OBS TSV variants (4 types)
+|   +-- obs_twl.go          # TSV OBS Translation Words Links
 |   +-- subjects/
 |       +-- register.go     # Registers all handlers
 ```

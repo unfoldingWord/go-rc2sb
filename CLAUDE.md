@@ -60,12 +60,12 @@ go-rc2sb/
 │   ├── aligned_bible.go    # Bible/USFM handler (Aligned Bible, Bible, Hebrew OT, Greek NT)
 │   ├── tw.go               # Translation Words handler
 │   ├── ta.go               # Translation Academy handler
-│   ├── tn.go               # TSV Translation Notes handler
-│   ├── tq.go               # TSV Translation Questions handler
+│   ├── bible_tsv.go        # Generic Bible TSV handler (TN, TQ, SN, SQ)
 │   ├── twl.go              # TSV Translation Words Links handler (with payload)
 │   ├── obs_tsv.go          # Generic OBS TSV handler (4 variants)
+│   ├── obs_twl.go          # TSV OBS Translation Words Links handler
 │   └── subjects/
-│       └── register.go     # Registers all 14 handlers via init()
+│       └── register.go     # Registers all 17 handlers via init()
 ```
 
 ### Key Design Patterns
@@ -88,11 +88,14 @@ go-rc2sb/
 | Translation Academy | peripheral/x-peripheralArticles | uWBurritos | TA |
 | TSV Translation Notes | parascriptural/x-bcvnotes | uWBurritos | TN |
 | TSV Translation Questions | parascriptural/x-bcvquestions | uWBurritos | TQ |
+| TSV Study Notes | parascriptural/x-bcvnotes | uWBurritos | SN |
+| TSV Study Questions | parascriptural/x-bcvquestions | uWBurritos | SQ |
 | TSV Translation Words Links | parascriptural/x-bcvarticles | uWBurritos | TW |
 | TSV OBS Study Notes | peripheral/x-obsnotes | BurritoTruck | OBSSN |
 | TSV OBS Study Questions | peripheral/x-obsquestions | BurritoTruck | OBSSQ |
 | TSV OBS Translation Notes | peripheral/x-obsnotes | BurritoTruck | OBSTN |
 | TSV OBS Translation Questions | peripheral/x-obsquestions | BurritoTruck | OBSTQ |
+| TSV OBS Translation Words Links | parascriptural/x-bcvarticles | BurritoTruck | OBSTWL |
 
 ### RC Format (Input)
 - **manifest.yaml**: Dublin Core metadata (conformsto: rc0.2), project list, language, versioning
@@ -117,7 +120,7 @@ go-rc2sb/
 
 ### Testing
 
-- **Integration tests** (`convert_test.go`): One test per subject type (12 total, including TWLPath and TWLPath variant tests). Requires `samples/` directory (gitignored) with RC/SB pairs. Tests compare structural metadata (flavor type, scope keys, abbreviation, language, ingredient keys) and verify internal consistency (every ingredient exists on disk with correct MD5 and size).
+- **Integration tests** (`convert_test.go`): One test per subject type (14 total, including TWLPath and TWLPath variant tests). Requires `samples/` directory (gitignored) with RC/SB pairs. Tests compare structural metadata (flavor type, scope keys, abbreviation, language, ingredient keys) and verify internal consistency (every ingredient exists on disk with correct MD5 and size).
 - **Unit tests**: `rc/manifest_test.go`, `sb/ingredient_test.go`, `sb/metadata_test.go`, `books/books_test.go`
 - **Error handling tests** (`error_test.go`): Missing manifest, unsupported subject, cancelled context, invalid YAML
 

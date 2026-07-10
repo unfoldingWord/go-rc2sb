@@ -24,11 +24,31 @@ func init() {
 	// Translation Academy
 	handler.Register(handler.NewTAHandler())
 
-	// TSV Translation Notes
-	handler.Register(handler.NewTNHandler())
-
-	// TSV Translation Questions
-	handler.Register(handler.NewTQHandler())
+	// Bible-based TSV variants (one TSV file per book, shared conversion logic)
+	handler.Register(handler.NewBibleTSVHandler(
+		"TSV Translation Notes",
+		"x-bcvnotes",
+		"TN",
+		"tn_",
+	))
+	handler.Register(handler.NewBibleTSVHandler(
+		"TSV Translation Questions",
+		"x-bcvquestions",
+		"TQ",
+		"tq_",
+	))
+	handler.Register(handler.NewBibleTSVHandler(
+		"TSV Study Notes",
+		"x-bcvnotes",
+		"SN",
+		"sn_",
+	))
+	handler.Register(handler.NewBibleTSVHandler(
+		"TSV Study Questions",
+		"x-bcvquestions",
+		"SQ",
+		"sq_",
+	))
 
 	// TSV Translation Words Links
 	handler.Register(handler.NewTWLHandler())

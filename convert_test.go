@@ -438,6 +438,60 @@ func TestConvertTSVTranslationQuestions(t *testing.T) {
 	verifyRootFileCopying(t, inDir, outDir, generated)
 }
 
+// TestConvertTSVStudyNotes tests conversion of TSV Study Notes (e.g. WorldView/en_sn).
+func TestConvertTSVStudyNotes(t *testing.T) {
+	samples := samplesDir(t)
+	sampleDir := filepath.Join(samples, "TSV Study Notes")
+	inDir := filepath.Join(sampleDir, "rc")
+	sbDir := filepath.Join(sampleDir, "sb")
+
+	outDir := t.TempDir()
+	ctx := context.Background()
+
+	result, err := rc2sb.Convert(ctx, inDir, outDir, rc2sb.Options{})
+	if err != nil {
+		t.Fatalf("Convert failed: %v", err)
+	}
+
+	if result.Subject != "TSV Study Notes" {
+		t.Errorf("Subject = %q; want %q", result.Subject, "TSV Study Notes")
+	}
+
+	expected := loadExpectedMetadata(t, sbDir)
+	generated := loadGeneratedMetadata(t, outDir)
+
+	compareStructuralMetadata(t, expected, generated)
+	verifyInternalConsistency(t, generated, outDir)
+	verifyRootFileCopying(t, inDir, outDir, generated)
+}
+
+// TestConvertTSVStudyQuestions tests conversion of TSV Study Questions (e.g. WorldView/en_sq).
+func TestConvertTSVStudyQuestions(t *testing.T) {
+	samples := samplesDir(t)
+	sampleDir := filepath.Join(samples, "TSV Study Questions")
+	inDir := filepath.Join(sampleDir, "rc")
+	sbDir := filepath.Join(sampleDir, "sb")
+
+	outDir := t.TempDir()
+	ctx := context.Background()
+
+	result, err := rc2sb.Convert(ctx, inDir, outDir, rc2sb.Options{})
+	if err != nil {
+		t.Fatalf("Convert failed: %v", err)
+	}
+
+	if result.Subject != "TSV Study Questions" {
+		t.Errorf("Subject = %q; want %q", result.Subject, "TSV Study Questions")
+	}
+
+	expected := loadExpectedMetadata(t, sbDir)
+	generated := loadGeneratedMetadata(t, outDir)
+
+	compareStructuralMetadata(t, expected, generated)
+	verifyInternalConsistency(t, generated, outDir)
+	verifyRootFileCopying(t, inDir, outDir, generated)
+}
+
 // TestConvertTSVTranslationWordsLinks tests conversion of TSV Translation Words Links with payload.
 func TestConvertTSVTranslationWordsLinks(t *testing.T) {
 	samples := samplesDir(t)
