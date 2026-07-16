@@ -813,9 +813,18 @@ func TestOBSTWL_TypeAndIdentity(t *testing.T) {
 		t.Error("LocalizedNames missing book-obs entry")
 	}
 
-	// BurritoTruck identity with the OBSTWL abbreviation.
-	if _, ok := metadata.IDAuthorities["BurritoTruck"]; !ok {
-		t.Errorf("IDAuthorities missing BurritoTruck; got %v", metadata.IDAuthorities)
+	// DCS identity with the OBSTWL abbreviation. The primary identifier falls
+	// back to "<publisher>/<lang>_<identifier>" when no owner/repo is provided.
+	if _, ok := metadata.IDAuthorities["dcs"]; !ok {
+		t.Errorf("IDAuthorities missing dcs; got %v", metadata.IDAuthorities)
+	}
+	primary, ok := metadata.Identification.Primary["dcs"]["test/en_obs-twl"]
+	if !ok {
+		t.Errorf("Primary missing dcs test/en_obs-twl; got %v", metadata.Identification.Primary)
+	}
+	// No revision option and no manifest version -> "1" fallback.
+	if primary.Revision != "1" {
+		t.Errorf("Revision = %q; want %q", primary.Revision, "1")
 	}
 	if abbr := metadata.Identification.Abbreviation["en"]; abbr != "OBSTWL" {
 		t.Errorf("Abbreviation = %q; want %q", abbr, "OBSTWL")

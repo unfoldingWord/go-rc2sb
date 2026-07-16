@@ -128,7 +128,7 @@ func NewMetadata() *Metadata {
 			Category:      "source",
 			Generator: Generator{
 				SoftwareName:    "go-rc2sb",
-				SoftwareVersion: "0.0.1",
+				SoftwareVersion: moduleVersion,
 				UserName:        "",
 			},
 			DefaultLocale: "en",

@@ -32,7 +32,7 @@ func (h *obsTSVHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDi
 		return nil, err
 	}
 
-	m := BuildBaseMetadata(manifest, "BurritoTruck", h.config.abbreviation)
+	m := BuildBaseMetadata(manifest, opts, h.config.abbreviation)
 
 	// Set type
 	m.Type = sb.Type{

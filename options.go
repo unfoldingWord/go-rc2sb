@@ -34,6 +34,40 @@ type Options struct {
 	// If empty, TSV handlers will use project titles from the manifest,
 	// falling back to English names from the books package.
 	USFMPath string
+
+	// Owner is the repository owner (user or organization) on DCS, used to
+	// build the burrito's primary identifier as "owner/repo" under the "dcs"
+	// ID authority.
+	//
+	// If empty, the owner is detected from the git remote "origin" URL of the
+	// input directory (when it is a git clone), falling back to the manifest's
+	// dublin_core.publisher.
+	Owner string
+
+	// RepoName is the repository name on DCS (e.g., "en_tw"), used together
+	// with Owner to build the burrito's primary identifier.
+	//
+	// If empty, the name is detected from the git remote "origin" URL of the
+	// input directory, falling back to the DCS naming convention
+	// "<language>_<identifier>" from the manifest.
+	RepoName string
+
+	// DCSURL is the base URL of the DCS instance that acts as the burrito's
+	// ID authority (recorded in idAuthorities and referenced by
+	// identification.primary).
+	//
+	// If empty, the URL is detected from the git remote "origin" URL of the
+	// input directory, falling back to "https://git.door43.org".
+	DCSURL string
+
+	// Revision identifies the state of the source repository that was
+	// converted (e.g., a DCS release number, tag, or commit SHA), recorded in
+	// identification.primary.
+	//
+	// If empty, the HEAD commit SHA of the input directory is used (when it is
+	// a git clone), falling back to the manifest's dublin_core.version (the
+	// published release number), then "1".
+	Revision string
 }
 
 // Result holds information about a completed conversion.

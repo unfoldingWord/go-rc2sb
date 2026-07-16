@@ -83,7 +83,7 @@ func (h *obsHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, 
 		return nil, err
 	}
 
-	m := BuildBaseMetadata(manifest, "BurritoTruck", "OBS")
+	m := BuildBaseMetadata(manifest, opts, "OBS")
 
 	// Build currentScope as the deduplicated union of all OBS story scopes.
 	// The SB scope schema requires each book's reference array to have unique

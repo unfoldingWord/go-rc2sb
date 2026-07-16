@@ -28,7 +28,7 @@ func (h *twHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, o
 		return nil, err
 	}
 
-	m := BuildBaseMetadata(manifest, "uWBurritos", "TW")
+	m := BuildBaseMetadata(manifest, opts, "TW")
 
 	// Set type - parascriptural/x-bcvarticles (same as TWL)
 	currentScope := make(map[string][]string)

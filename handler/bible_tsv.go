@@ -36,7 +36,7 @@ func (h *bibleTSVHandler) Convert(ctx context.Context, manifest *rc.Manifest, in
 		return nil, err
 	}
 
-	m := BuildBaseMetadata(manifest, "uWBurritos", h.config.abbreviation)
+	m := BuildBaseMetadata(manifest, opts, h.config.abbreviation)
 
 	// Set type - parascriptural with the variant's flavor
 	currentScope := make(map[string][]string)

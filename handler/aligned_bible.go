@@ -34,7 +34,7 @@ func (h *bibleHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir
 		return nil, err
 	}
 
-	m := BuildBaseMetadata(manifest, "uWBurritos", "")
+	m := BuildBaseMetadata(manifest, opts, "")
 
 	// Set type - scripture/textTranslation
 	currentScope := make(map[string][]string)

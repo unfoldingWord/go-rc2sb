@@ -35,4 +35,6 @@ go.work.sum
 # Other
 samples/
 .claude/
+/rc2sb
+__pycache__/
 

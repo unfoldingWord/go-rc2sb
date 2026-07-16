@@ -34,7 +34,7 @@ func (h *obsTWLHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDi
 		return nil, err
 	}
 
-	m := BuildBaseMetadata(manifest, "BurritoTruck", "OBSTWL")
+	m := BuildBaseMetadata(manifest, opts, "OBSTWL")
 
 	// Same parascriptural/x-bcvarticles type as the Bible TWL handler.
 	m.Type = sb.Type{

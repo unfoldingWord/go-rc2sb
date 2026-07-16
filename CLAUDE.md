@@ -36,6 +36,8 @@ func Convert(ctx context.Context, inDir string, outDir string, opts Options) (Re
 - `Options.PayloadPath` specifies an explicit path to a `<lang>_tw` directory for TWL payload creation. If empty, auto-detects `<lang>_tw/` inside `inDir`.
 - `Options.TWLPath` specifies an explicit path to a `<lang>_twl` directory for TW conversion. If empty, auto-detects `<lang>_twl/` inside `inDir`.
 - `Options.USFMPath` specifies a directory containing USFM files for localized Bible book names (used by TSV handlers). Bible handlers read USFM directly from their own input files.
+- `Options.Owner`, `Options.RepoName`, `Options.DCSURL` specify the DCS repo identity used for the burrito's primary identifier (`owner/repo` under the `dcs` ID authority). If empty, detected from the git remote `origin` URL of `inDir`, then from the manifest (publisher + `<lang>_<identifier>`).
+- `Options.Revision` specifies the converted source's revision (release number, tag, or commit SHA) for `identification.primary`. If empty, uses the git HEAD commit SHA of `inDir`, then `dublin_core.version`, then `"1"`.
 
 ### Package Structure
 
@@ -77,25 +79,27 @@ go-rc2sb/
 
 ### Subject -> SB Type Mapping
 
-| Subject | FlavorType/Flavor | IdAuthority | Abbreviation |
-|---------|-------------------|-------------|-------------|
-| Open Bible Stories | gloss/textStories | BurritoTruck | OBS |
-| Aligned Bible | scripture/textTranslation | uWBurritos | (from RC identifier) |
-| Bible | scripture/textTranslation | uWBurritos | (from RC identifier) |
-| Hebrew Old Testament | scripture/textTranslation | uWBurritos | (from RC identifier) |
-| Greek New Testament | scripture/textTranslation | uWBurritos | (from RC identifier) |
-| Translation Words | parascriptural/x-bcvarticles | uWBurritos | TW |
-| Translation Academy | peripheral/x-peripheralArticles | uWBurritos | TA |
-| TSV Translation Notes | parascriptural/x-bcvnotes | uWBurritos | TN |
-| TSV Translation Questions | parascriptural/x-bcvquestions | uWBurritos | TQ |
-| TSV Study Notes | parascriptural/x-bcvnotes | uWBurritos | SN |
-| TSV Study Questions | parascriptural/x-bcvquestions | uWBurritos | SQ |
-| TSV Translation Words Links | parascriptural/x-bcvarticles | uWBurritos | TW |
-| TSV OBS Study Notes | peripheral/x-obsnotes | BurritoTruck | OBSSN |
-| TSV OBS Study Questions | peripheral/x-obsquestions | BurritoTruck | OBSSQ |
-| TSV OBS Translation Notes | peripheral/x-obsnotes | BurritoTruck | OBSTN |
-| TSV OBS Translation Questions | peripheral/x-obsquestions | BurritoTruck | OBSTQ |
-| TSV OBS Translation Words Links | parascriptural/x-bcvarticles | BurritoTruck | OBSTWL |
+All subjects use the single `dcs` ID authority (the DCS instance hosting the source repo, default `https://git.door43.org`). The primary identifier is `owner/repo` (e.g., `unfoldingWord/en_tw`), resolved by priority: (1) `Options.Owner`/`Options.RepoName`, (2) the git remote `origin` URL of `inDir` (parsed from `.git/config`, see `identity.go`), (3) manifest fallback — `dublin_core.publisher` for the owner and `<language>_<identifier>` for the repo name. The primary entry's `revision` is resolved by priority: (1) `Options.Revision`, (2) the git HEAD commit SHA of `inDir`, (3) `dublin_core.version`, (4) `"1"`.
+
+| Subject | FlavorType/Flavor | Abbreviation |
+|---------|-------------------|--------------|
+| Open Bible Stories | gloss/textStories | OBS |
+| Aligned Bible | scripture/textTranslation | (from RC identifier) |
+| Bible | scripture/textTranslation | (from RC identifier) |
+| Hebrew Old Testament | scripture/textTranslation | (from RC identifier) |
+| Greek New Testament | scripture/textTranslation | (from RC identifier) |
+| Translation Words | parascriptural/x-bcvarticles | TW |
+| Translation Academy | peripheral/x-peripheralArticles | TA |
+| TSV Translation Notes | parascriptural/x-bcvnotes | TN |
+| TSV Translation Questions | parascriptural/x-bcvquestions | TQ |
+| TSV Study Notes | parascriptural/x-bcvnotes | SN |
+| TSV Study Questions | parascriptural/x-bcvquestions | SQ |
+| TSV Translation Words Links | parascriptural/x-bcvarticles | TW |
+| TSV OBS Study Notes | peripheral/x-obsnotes | OBSSN |
+| TSV OBS Study Questions | peripheral/x-obsquestions | OBSSQ |
+| TSV OBS Translation Notes | peripheral/x-obsnotes | OBSTN |
+| TSV OBS Translation Questions | peripheral/x-obsquestions | OBSTQ |
+| TSV OBS Translation Words Links | parascriptural/x-bcvarticles | OBSTWL |
 
 ### RC Format (Input)
 - **manifest.yaml**: Dublin Core metadata (conformsto: rc0.2), project list, language, versioning

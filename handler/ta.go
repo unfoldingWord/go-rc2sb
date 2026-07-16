@@ -26,7 +26,7 @@ func (h *taHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, o
 		return nil, err
 	}
 
-	m := BuildBaseMetadata(manifest, "uWBurritos", "TA")
+	m := BuildBaseMetadata(manifest, opts, "TA")
 
 	// Set type - peripheral/x-peripheralArticles
 	m.Type = sb.Type{

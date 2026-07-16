@@ -63,8 +63,20 @@ func CopyFileWithScope(src, outDir, ingredientKey string, scope map[string][]str
 	return sb.ComputeIngredientWithScope(dst, scope)
 }
 
+// IDAuthorityDCS is the idAuthorities key used for the DCS instance that
+// hosts the source repository and mints the "owner/repo" primary identifier.
+const IDAuthorityDCS = "dcs"
+
+// DefaultDCSURL is the ID authority URL used when none is provided or detected.
+const DefaultDCSURL = "https://git.door43.org"
+
 // BuildBaseMetadata creates a base SB Metadata from an RC manifest with common fields set.
-func BuildBaseMetadata(manifest *rc.Manifest, idAuthority, abbreviation string) *sb.Metadata {
+// The primary identifier is "owner/repo" under the DCS ID authority. Owner, repo name,
+// DCS URL, and revision come from opts (resolved by Convert from explicit options or the
+// git clone metadata); anything missing falls back to the manifest: dublin_core.publisher
+// for the owner, the "<language>_<identifier>" DCS naming convention for the repo name,
+// and dublin_core.version (then "1") for the revision.
+func BuildBaseMetadata(manifest *rc.Manifest, opts Options, abbreviation string) *sb.Metadata {
 	m := sb.NewMetadata()
 
 	now := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
@@ -73,16 +85,13 @@ func BuildBaseMetadata(manifest *rc.Manifest, idAuthority, abbreviation string) 
 	dc := manifest.DublinCore
 
 	// Set ID authority
-	if idAuthority == "BurritoTruck" {
-		m.IDAuthorities[idAuthority] = sb.IDAuthority{
-			ID:   "https://git.door43.org/BurritoTruck",
-			Name: map[string]string{"en": "Door43 Burrito Truck"},
-		}
-	} else {
-		m.IDAuthorities[idAuthority] = sb.IDAuthority{
-			ID:   "https://git.door43.org/uW",
-			Name: map[string]string{"en": "Door43 uW Burritos"},
-		}
+	dcsURL := opts.DCSURL
+	if dcsURL == "" {
+		dcsURL = DefaultDCSURL
+	}
+	m.IDAuthorities[IDAuthorityDCS] = sb.IDAuthority{
+		ID:   dcsURL,
+		Name: map[string]string{"en": "Door43 Content Service"},
 	}
 
 	// Set identification
@@ -91,11 +100,36 @@ func BuildBaseMetadata(manifest *rc.Manifest, idAuthority, abbreviation string) 
 		abbr = strings.ToUpper(dc.Identifier)
 	}
 
+	owner := opts.Owner
+	if owner == "" {
+		// Publisher is the closest manifest field to the DCS owner; sanitize it
+		// into a slug-safe form (e.g. "unfoldingWord®" -> "unfoldingWord").
+		owner = strings.ReplaceAll(strings.TrimSpace(strings.ReplaceAll(dc.Publisher, "®", "")), " ", "-")
+	}
+	repoName := opts.RepoName
+	if repoName == "" && dc.Language.Identifier != "" && dc.Identifier != "" {
+		repoName = dc.Language.Identifier + "_" + dc.Identifier
+	}
+	primaryID := repoName
+	if owner != "" && repoName != "" {
+		primaryID = owner + "/" + repoName
+	}
+	if primaryID == "" {
+		primaryID = abbr
+	}
+	revision := opts.Revision
+	if revision == "" {
+		revision = dc.Version
+	}
+	if revision == "" {
+		revision = "1"
+	}
+
 	m.Identification = sb.Identification{
 		Primary: map[string]map[string]sb.PrimaryEntry{
-			idAuthority: {
-				abbr: {
-					Revision:  "1",
+			IDAuthorityDCS: {
+				primaryID: {
+					Revision:  revision,
 					Timestamp: now,
 				},
 			},
