@@ -79,6 +79,38 @@ func init() {
 		"tq_",
 	))
 
+	// Legacy OBS variants whose content is a tree of Markdown files rather than
+	// a single TSV. These convert the Markdown to TSV so the output matches the
+	// "TSV OBS ..." subject above it.
+	handler.Register(handler.NewOBSMarkdownHandler(
+		"OBS Translation Questions",
+		"x-obsquestions",
+		"OBSTQ",
+		"tq_",
+		handler.OBSLayoutFrameQuestions,
+	))
+	handler.Register(handler.NewOBSMarkdownHandler(
+		"OBS Translation Notes",
+		"x-obsnotes",
+		"OBSTN",
+		"tn_",
+		handler.OBSLayoutFrameNotes,
+	))
+	handler.Register(handler.NewOBSMarkdownHandler(
+		"OBS Study Notes",
+		"x-obsnotes",
+		"OBSSN",
+		"sn_",
+		handler.OBSLayoutFrameNotes,
+	))
+	handler.Register(handler.NewOBSMarkdownHandler(
+		"OBS Study Questions",
+		"x-obsquestions",
+		"OBSSQ",
+		"sq_",
+		handler.OBSLayoutStoryQuestions,
+	))
+
 	// TSV OBS Translation Words Links — TWL-style payload + rc:// link rewriting
 	// (parascriptural/x-bcvarticles), but with OBS treated as a single book.
 	handler.Register(handler.NewOBSTWLHandler())
