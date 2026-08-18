@@ -66,8 +66,9 @@ go-rc2sb/
 │   ├── twl.go              # TSV Translation Words Links handler (with payload)
 │   ├── obs_tsv.go          # Generic OBS TSV handler (4 variants)
 │   ├── obs_twl.go          # TSV OBS Translation Words Links handler
+│   ├── obs_md.go           # Legacy OBS Markdown handler (4 variants, converts MD -> TSV)
 │   └── subjects/
-│       └── register.go     # Registers all 17 handlers via init()
+│       └── register.go     # Registers all 21 handlers via init()
 ```
 
 ### Key Design Patterns
@@ -100,6 +101,16 @@ All subjects use the single `dcs` ID authority (the DCS instance hosting the sou
 | TSV OBS Translation Notes | peripheral/x-obsnotes | OBSTN |
 | TSV OBS Translation Questions | peripheral/x-obsquestions | OBSTQ |
 | TSV OBS Translation Words Links | parascriptural/x-bcvarticles | OBSTWL |
+| OBS Translation Notes | peripheral/x-obsnotes | OBSTN |
+| OBS Translation Questions | peripheral/x-obsquestions | OBSTQ |
+| OBS Study Notes | peripheral/x-obsnotes | OBSSN |
+| OBS Study Questions | peripheral/x-obsquestions | OBSSQ |
+
+The last four are the legacy pre-TSV subjects: their content is a tree of Markdown
+files rather than a single TSV. They are handled by `handler/obs_md.go`, which
+converts the Markdown to TSV so the burrito is structurally identical to the one
+the matching `TSV OBS ...` subject produces — the same flavor, abbreviation,
+`localizedNames`, and the same `ingredients/OBS.tsv` plus `ingredients/LICENSE.md`.
 
 ### RC Format (Input)
 - **manifest.yaml**: Dublin Core metadata (conformsto: rc0.2), project list, language, versioning
@@ -120,10 +131,24 @@ All subjects use the single `dcs` ID authority (the DCS instance hosting the sou
 6. **TWL payload resolution**: If `Options.PayloadPath` is set or a `<lang>_tw/` subdirectory exists in the RC repo (where `<lang>` = `dublin_core.language.identifier`), copies the TW `bible/*` to `ingredients/payload/` and rewrites `rc://*/tw/dict/bible/{path}` links in TSV files to `./payload/{path}.md`
 6b. **TW conversion (like TWL)**: Translation Words repos are converted identically to TWL — the TW `bible/*` is always copied to `ingredients/payload/`. If `Options.TWLPath` is set or a `<lang>_twl/` subdirectory exists in the RC repo, its `twl_*.tsv` files are processed as main ingredients (strip `twl_` prefix, rewrite `rc://` links to `./payload/` paths, set per-book scope).
 6c. **OBS content**: Only the story files `01.md`–`50.md` plus `front.md` and `back.md` land in `ingredients/content/` — nothing else. `content/front/intro.md` is flattened to `ingredients/content/front.md` and `content/back/intro.md` to `ingredients/content/back.md` (the `front/`/`back/` directories are never recreated; flat `front.md`/`back.md` in the RC are copied through). `content/front/title.md` is not copied; its trimmed contents become `identification.name` and `identification.description` under the RC language tag, with `"en": "Open Bible Stories"` added as fallback whenever the title doesn't provide an English entry.
+6d. **Legacy OBS Markdown -> TSV** (`handler/obs_md.go`, subjects without the `TSV ` prefix): the Markdown tree is parsed into the same TSV the matching `TSV OBS ...` subject ships, written to `ingredients/OBS.tsv`. Three source layouts:
+   - *Frame questions* (`OBS Translation Questions`): `content/<story>/<frame>.md`, each `# heading` a question and the body below it the answer. Columns `Reference, ID, Tags, Quote, Occurrence, Question, Response`; Tags/Quote/Occurrence stay empty.
+   - *Frame notes* (`OBS Translation Notes`, `OBS Study Notes`): same file layout, each `# heading` the quoted phrase and the body the note. Columns `Reference, ID, Tags, SupportReference, Quote, Occurrence, Note`; `Occurrence` is always `1` and `<story>/00.md` becomes reference `<story>:0` tagged `title`.
+   - *Story questions* (`OBS Study Questions`): `content/<story>.md` with `##` sections of numbered Q/A pairs. `content/00.md` becomes the `front` row tagged `intro`. Section headings are localized, so tags come from position: the first question-bearing section is `meaning`, later ones `application`, and a section with no numbered items is the `summary`.
+
+   Conversion details shared by all three:
+   - **References** drop the zero padding (`content/01/01.md` -> `1:1`). Story-questions references come from the `[<story>:<frame>](<story>/<frame>)` links in the answer, spanning min to max within the same story; an answer that links no frame of its own story gets the whole-story reference `<story>:1-<lastFrame>` from `obsStoryFrames`, the canonical OBS frame counts (verified against `unfoldingWord/en_obs`, and matching the en `sq_OBS.tsv` summary references for all 50 stories).
+   - **IDs** are 4 characters matching `[a-z][a-z0-9]{3}`, derived by MD5 from the row's own content rather than randomly, so re-converting a source yields a byte-identical TSV and a stable ingredient checksum. Collisions are broken with an incrementing salt.
+   - **SupportReference** is lifted out of a note only when its `rc://.../ta/man/...` link sits in a *trailing* parenthetical (`(See: [[...]])`, including the escaped `\[\[...\]\]` spelling), with the language segment normalized to `*`. A link elsewhere in the note is left in place, since removing it would cut into the surrounding sentence.
+   - **Important Terms blocks** (a heading followed by nothing but `[[rc://.../tw/...]]` bullets) are dropped — the TSV notes format has no column for them. They are recognized by their body, since the heading is localized.
+   - **Cell escaping**: newlines become the literal two-character sequence `\n` and tabs become spaces, matching the unfoldingWord TSV convention.
+   - **Already-TSV repos**: several catalog repos declare a legacy Markdown subject but ship a TSV. When `projects[].path` resolves to a `.tsv`, or a `<prefix>OBS.tsv` sits at the repo root (some manifests still point at a stale `./content`), that file is copied through unchanged instead of being regenerated.
+
 7. **Localized book names**: Bible book names in `localizedNames` are resolved by priority: (1) USFM `\toc1`/`\toc2`/`\toc3` markers from the USFM file itself (Bible handlers) or from `Options.USFMPath` (TSV handlers), (2) manifest `projects[].title`, (3) English fallback from `books/books.go`. The `books.ParseUSFMBookNames()` function reads the first 20 lines of a USFM file to extract these markers, falling back to `\mt`/`\h` when toc markers are absent.
 
 ### Testing
 
+- **Handler tests** (`handler/obs_md_test.go`): Cover the legacy OBS Markdown handler end to end from temp-dir fixtures — the three source layouts, `title`/`intro`/`meaning`/`application`/`summary` tagging, SupportReference extraction, Important Terms dropping, TSV pass-through, ID form/uniqueness/stability, and cell escaping.
 - **Integration tests** (`convert_test.go`): One test per subject type (14 total, including TWLPath and TWLPath variant tests). Requires `samples/` directory (gitignored) with RC/SB pairs. Tests compare structural metadata (flavor type, scope keys, abbreviation, language, ingredient keys) and verify internal consistency (every ingredient exists on disk with correct MD5 and size).
 - **Unit tests**: `rc/manifest_test.go`, `sb/ingredient_test.go`, `sb/metadata_test.go`, `books/books_test.go`
 - **Error handling tests** (`error_test.go`): Missing manifest, unsupported subject, cancelled context, invalid YAML
