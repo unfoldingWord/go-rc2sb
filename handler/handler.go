@@ -3,6 +3,7 @@ package handler
 
 import (
 	"context"
+	"time"
 
 	"github.com/unfoldingWord/go-rc2sb/rc"
 	"github.com/unfoldingWord/go-rc2sb/sb"
@@ -37,6 +38,10 @@ type Options struct {
 	// Revision identifies the converted state of the source repository.
 	// See rc2sb.Options.Revision for details.
 	Revision string
+
+	// Timestamp is the time recorded as dateCreated and the primary identifier's
+	// timestamp. See rc2sb.Options.Timestamp for details.
+	Timestamp time.Time
 }
 
 // Handler is the interface that each subject-specific converter implements.

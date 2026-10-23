@@ -1,5 +1,7 @@
 package rc2sb
 
+import "time"
+
 // Options configures the RC to SB conversion.
 type Options struct {
 	// PayloadPath is the path to a Translation Words directory (e.g., "/path/to/en_tw")
@@ -68,6 +70,13 @@ type Options struct {
 	// a git clone), falling back to the manifest's dublin_core.version (the
 	// published release number), then "1".
 	Revision string
+
+	// Timestamp is the time recorded as meta.dateCreated and as the primary
+	// identifier's timestamp, e.g. the commit time of the converted revision,
+	// so that a revision always converts to the same metadata.json.
+	//
+	// If zero, the time of the conversion is used.
+	Timestamp time.Time
 }
 
 // Result holds information about a completed conversion.
