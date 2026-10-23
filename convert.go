@@ -45,6 +45,7 @@ func Convert(ctx context.Context, inDir string, outDir string, opts Options) (Re
 		TWLPath:     opts.TWLPath,
 		USFMPath:    opts.USFMPath,
 		Timestamp:   opts.Timestamp,
+		Upstream:    opts.Upstream,
 	}
 	resolveRepoIdentity(inDir, opts, &handlerOpts)
 	metadata, err := h.Convert(ctx, manifest, inDir, outDir, handlerOpts)

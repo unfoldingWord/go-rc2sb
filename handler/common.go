@@ -142,6 +142,19 @@ func BuildBaseMetadata(manifest *rc.Manifest, opts Options, abbreviation string)
 		Description:  map[string]string{"en": dc.Title},
 		Abbreviation: map[string]string{"en": abbr},
 	}
+	if len(opts.Upstream) > 0 {
+		upstream := make([]map[string]sb.PrimaryEntry, 0, len(opts.Upstream))
+		for _, u := range opts.Upstream {
+			stamp := now
+			if !u.Timestamp.IsZero() {
+				stamp = u.Timestamp.UTC().Format("2006-01-02T15:04:05.000Z")
+			}
+			upstream = append(upstream, map[string]sb.PrimaryEntry{
+				u.Owner + "/" + u.RepoName: {Revision: u.Revision, Timestamp: stamp},
+			})
+		}
+		m.Identification.Upstream = map[string][]map[string]sb.PrimaryEntry{IDAuthorityDCS: upstream}
+	}
 
 	// Set language
 	m.Languages = []sb.LanguageEntry{

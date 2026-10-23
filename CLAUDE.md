@@ -38,6 +38,7 @@ func Convert(ctx context.Context, inDir string, outDir string, opts Options) (Re
 - `Options.USFMPath` specifies a directory containing USFM files for localized Bible book names (used by TSV handlers). Bible handlers read USFM directly from their own input files.
 - `Options.Owner`, `Options.RepoName`, `Options.DCSURL` specify the DCS repo identity used for the burrito's primary identifier (`owner/repo` under the `dcs` ID authority). If empty, detected from the git remote `origin` URL of `inDir`, then from the manifest (publisher + `<lang>_<identifier>`).
 - `Options.Revision` specifies the converted source's revision (release number, tag, or commit SHA) for `identification.primary`. If empty, uses the git HEAD commit SHA of `inDir`, then `dublin_core.version`, then `"1"`.
+- `Options.Upstream` lists other DCS repo revisions the conversion takes content from (`Owner`, `RepoName`, `Revision`, `Timestamp`), recorded as SB `identification.upstream.dcs[]` entries keyed `owner/repo`. DCS passes the TW/TWL partner commit of a TW or TWL burrito, and the canonical `en_tw` commit a ts Translation Words conversion categorizes by.
 - `Options.Timestamp` is the time stamped as `meta.dateCreated` and the primary identifier's `timestamp` (DCS passes the converted commit's time, so a revision always converts to the same `metadata.json`). If zero, the conversion time is used.
 
 ### Package Structure
