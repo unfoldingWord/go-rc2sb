@@ -79,7 +79,11 @@ const DefaultDCSURL = "https://git.door43.org"
 func BuildBaseMetadata(manifest *rc.Manifest, opts Options, abbreviation string) *sb.Metadata {
 	m := sb.NewMetadata()
 
-	now := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	created := opts.Timestamp
+	if created.IsZero() {
+		created = time.Now()
+	}
+	now := created.UTC().Format("2006-01-02T15:04:05.000Z")
 	m.Meta.DateCreated = now
 
 	dc := manifest.DublinCore
