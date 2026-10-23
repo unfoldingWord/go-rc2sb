@@ -47,10 +47,12 @@ type IDAuthority struct {
 
 // Identification holds the identification section.
 type Identification struct {
-	Primary      map[string]map[string]PrimaryEntry `json:"primary"`
-	Name         map[string]string                  `json:"name"`
-	Description  map[string]string                  `json:"description"`
-	Abbreviation map[string]string                  `json:"abbreviation"`
+	Primary map[string]map[string]PrimaryEntry `json:"primary"`
+	// Upstream lists, per ID authority, the other revisions the burrito's content comes from.
+	Upstream     map[string][]map[string]PrimaryEntry `json:"upstream,omitempty"`
+	Name         map[string]string                    `json:"name"`
+	Description  map[string]string                    `json:"description"`
+	Abbreviation map[string]string                    `json:"abbreviation"`
 }
 
 // PrimaryEntry holds a primary identification entry.

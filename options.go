@@ -1,6 +1,10 @@
 package rc2sb
 
-import "time"
+import (
+	"time"
+
+	"github.com/unfoldingWord/go-rc2sb/handler"
+)
 
 // Options configures the RC to SB conversion.
 type Options struct {
@@ -77,7 +81,17 @@ type Options struct {
 	//
 	// If zero, the time of the conversion is used.
 	Timestamp time.Time
+
+	// Upstream lists other DCS repository revisions the conversion takes
+	// content from, recorded under identification.upstream with the "dcs" ID
+	// authority, e.g. the Translation Words revision whose articles a TSV
+	// Translation Words Links burrito carries in ingredients/payload/.
+	Upstream []Upstream
 }
+
+// Upstream identifies another DCS repository revision that a conversion takes
+// content from. See Options.Upstream.
+type Upstream = handler.Upstream
 
 // Result holds information about a completed conversion.
 type Result struct {

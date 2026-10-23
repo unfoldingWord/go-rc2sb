@@ -42,6 +42,22 @@ type Options struct {
 	// Timestamp is the time recorded as dateCreated and the primary identifier's
 	// timestamp. See rc2sb.Options.Timestamp for details.
 	Timestamp time.Time
+
+	// Upstream lists other DCS repo revisions the conversion takes content from.
+	// See rc2sb.Options.Upstream for details.
+	Upstream []Upstream
+}
+
+// Upstream identifies another DCS repository revision that a conversion takes
+// content from, recorded under identification.upstream as "owner/repo".
+type Upstream struct {
+	Owner    string
+	RepoName string
+	// Revision is the state of that repo that was used, e.g. a commit SHA.
+	Revision string
+	// Timestamp is that revision's time, e.g. its commit time. If zero, the
+	// burrito's own timestamp is used.
+	Timestamp time.Time
 }
 
 // Handler is the interface that each subject-specific converter implements.
