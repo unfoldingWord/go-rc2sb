@@ -26,7 +26,7 @@ func Convert(ctx context.Context, inDir string, outDir string, opts Options) (Re
 		return Result{}, err
 	}
 
-	subject := manifest.DublinCore.Subject
+	subject := manifestSubject(manifest)
 
 	// Look up the handler for this subject
 	h, err := handler.Lookup(subject)

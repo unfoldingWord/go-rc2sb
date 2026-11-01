@@ -105,6 +105,18 @@ Converts an RC repository to SB format.
 
 Returns a `Result` with conversion metadata, or an error.
 
+### `ResolveSubject(subject, projectIDs) string`
+
+Returns the subject an RC converts as, from its manifest's `dublin_core.subject` and its projects' identifiers. `Convert` picks its handler with it, and DCS uses it so a catalog entry carries the subject its burrito converts as.
+
+- `Bible Stories` (any case) is `Open Bible Stories`, and a `Translator ...` subject is `Translation ...`.
+- `Bible translation comprehension questions` is `Translation Questions`.
+- A notes, questions or words-links subject whose only project is `obs` takes its OBS form, e.g. `Study Notes` is `OBS Study Notes` and `TSV Translation Notes` is `TSV OBS Translation Notes`.
+
+### `Supports(subject) bool` and `SupportedSubjects() []string`
+
+Report whether `Convert` converts a resolved subject, and list the subjects it converts.
+
 ### Options
 
 ```go
@@ -155,6 +167,10 @@ type Result struct {
 | TSV OBS Translation Notes | peripheral/x-obsnotes | Single TSV file conversion |
 | TSV OBS Translation Questions | peripheral/x-obsquestions | Single TSV file conversion |
 | TSV OBS Translation Words Links | parascriptural/x-bcvarticles | TWL-style payload and rc:// rewriting; OBS as a single book |
+| OBS Translation Notes, OBS Study Notes | peripheral/x-obsnotes | Converts the content/<story>/<frame>.md Markdown to the TSV of the "TSV OBS ..." subject |
+| OBS Translation Questions, OBS Study Questions | peripheral/x-obsquestions | Converts the Markdown to the TSV of the "TSV OBS ..." subject |
+| Translation Notes, Study Notes | parascriptural/x-bcvnotes | Converts the <book>/<chapter>/<chunk>.md Markdown to one TSV per book, as the "TSV ..." subject ships; a project path that is already a TSV is copied through |
+| Translation Questions, Study Questions | parascriptural/x-bcvquestions | Same, with the questions columns |
 
 ## Error Handling
 

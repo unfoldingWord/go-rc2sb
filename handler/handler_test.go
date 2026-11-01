@@ -1187,6 +1187,10 @@ func TestLookup_AllRegisteredSubjects(t *testing.T) {
 		"OBS Translation Notes",
 		"OBS Study Notes",
 		"OBS Study Questions",
+		"Translation Notes",
+		"Translation Questions",
+		"Study Notes",
+		"Study Questions",
 	}
 
 	for _, subject := range expectedSubjects {
@@ -1204,8 +1208,8 @@ func TestLookup_AllRegisteredSubjects(t *testing.T) {
 
 func TestSupportedSubjects_Count(t *testing.T) {
 	subjects := handler.SupportedSubjects()
-	if len(subjects) != 21 {
-		t.Errorf("SupportedSubjects() returned %d subjects; want 21. Got: %v", len(subjects), subjects)
+	if len(subjects) != 25 {
+		t.Errorf("SupportedSubjects() returned %d subjects; want 25. Got: %v", len(subjects), subjects)
 	}
 }
 
