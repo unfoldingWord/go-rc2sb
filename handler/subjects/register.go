@@ -111,6 +111,14 @@ func init() {
 		handler.OBSLayoutStoryQuestions,
 	))
 
+	// Legacy Bible helps whose content is a tree of Markdown files
+	// (<book>/<chapter>/<chunk>.md) rather than a TSV per book. These convert
+	// the Markdown to TSV so the output matches the "TSV ..." subject above.
+	handler.Register(handler.NewBibleMarkdownHandler("Translation Notes", "x-bcvnotes", "TN", true))
+	handler.Register(handler.NewBibleMarkdownHandler("Translation Questions", "x-bcvquestions", "TQ", false))
+	handler.Register(handler.NewBibleMarkdownHandler("Study Notes", "x-bcvnotes", "SN", true))
+	handler.Register(handler.NewBibleMarkdownHandler("Study Questions", "x-bcvquestions", "SQ", false))
+
 	// TSV OBS Translation Words Links — TWL-style payload + rc:// link rewriting
 	// (parascriptural/x-bcvarticles), but with OBS treated as a single book.
 	handler.Register(handler.NewOBSTWLHandler())
