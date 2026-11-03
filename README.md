@@ -110,8 +110,13 @@ Returns a `Result` with conversion metadata, or an error.
 Returns the subject an RC converts as, from its manifest's `dublin_core.subject` and its projects' identifiers. `Convert` picks its handler with it, and DCS uses it so a catalog entry carries the subject its burrito converts as.
 
 - `Bible Stories` (any case) is `Open Bible Stories`, and a `Translator ...` subject is `Translation ...`.
+- A subject that differs from a registered one only in case takes the registered spelling, e.g. `Open Bible stories` is `Open Bible Stories`.
 - `Bible translation comprehension questions` is `Translation Questions`.
 - A notes, questions or words-links subject whose only project is `obs` takes its OBS form, e.g. `Study Notes` is `OBS Study Notes` and `TSV Translation Notes` is `TSV OBS Translation Notes`.
+
+### `ResolveRCSubject(subject, identifier, projectIDs) string`
+
+`ResolveSubject` for an RC manifest: when `dublin_core.subject` is empty, the subject comes from `dublin_core.identifier` (`ta` is `Translation Academy`, `tw` is `Translation Words`, `obs-tn` is `OBS Translation Notes`, and so on). `Convert` uses it, so older manifests without a subject still convert.
 
 ### `Supports(subject) bool` and `SupportedSubjects() []string`
 

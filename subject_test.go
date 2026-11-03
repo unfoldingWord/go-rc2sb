@@ -25,9 +25,32 @@ func TestResolveSubject(t *testing.T) {
 		{"bible stories", []string{"obs"}, "Open Bible Stories"},
 		{"Open Bible Stories", []string{"obs"}, "Open Bible Stories"},
 		{"Greek Lexicon", []string{"ugl"}, "Greek Lexicon"},
+		{"Open Bible stories", []string{"obs"}, "Open Bible Stories"},
+		{"translation notes", []string{"obs"}, "OBS Translation Notes"},
+		{"TRANSLATOR notes", []string{"tit"}, "Translation Notes"},
+		{"bible Translation Comprehension Questions", []string{"gen"}, "Translation Questions"},
 	} {
 		if got := ResolveSubject(tc.subject, tc.projects); got != tc.want {
 			t.Errorf("ResolveSubject(%q, %q) = %q, want %q", tc.subject, tc.projects, got, tc.want)
+		}
+	}
+	for _, tc := range []struct {
+		subject, identifier string
+		want                string
+	}{
+		{"", "ta", "Translation Academy"},
+		{"  ", "TA", "Translation Academy"},
+		{"", "obs-tn", "OBS Translation Notes"},
+		{"Translation Words", "ta", "Translation Words"},
+		{"", "ugl", ""},
+	} {
+		if got := ResolveRCSubject(tc.subject, tc.identifier, nil); got != tc.want {
+			t.Errorf("ResolveRCSubject(%q, %q) = %q, want %q", tc.subject, tc.identifier, got, tc.want)
+		}
+	}
+	for _, s := range SupportedSubjects() {
+		if got := ResolveSubject(s, []string{"gen"}); got != s {
+			t.Errorf("ResolveSubject(%q) = %q, want it unchanged", s, got)
 		}
 	}
 	if !Supports("OBS Study Notes") || !Supports("Study Notes") || Supports("Greek Lexicon") {
