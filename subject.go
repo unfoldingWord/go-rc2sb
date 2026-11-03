@@ -12,6 +12,33 @@ var subjectAliases = map[string]string{
 	"Bible translation comprehension questions": "Translation Questions",
 }
 
+// identifierSubjects are the subjects of the resource identifiers RC manifests use,
+// for an older manifest whose dublin_core names no subject (e.g. Translation Academy
+// tags with only "type: man" and "identifier: ta").
+var identifierSubjects = map[string]string{
+	"obs":     "Open Bible Stories",
+	"obs-sn":  "OBS Study Notes",
+	"obs-sq":  "OBS Study Questions",
+	"obs-tn":  "OBS Translation Notes",
+	"obs-tq":  "OBS Translation Questions",
+	"obs-twl": "TSV OBS Translation Words Links",
+	"sn":      "Study Notes",
+	"sq":      "Study Questions",
+	"ta":      "Translation Academy",
+	"tn":      "Translation Notes",
+	"tq":      "Translation Questions",
+	"tw":      "Translation Words",
+	"twl":     "TSV Translation Words Links",
+	"ugnt":    "Greek New Testament",
+	"uhb":     "Hebrew Old Testament",
+	"ulb":     "Bible",
+	"udb":     "Bible",
+	"ult":     "Aligned Bible",
+	"ust":     "Aligned Bible",
+	"glt":     "Aligned Bible",
+	"gst":     "Aligned Bible",
+}
+
 // obsSubjects are the OBS forms of the helps subjects, which an RC takes when
 // its only project is "obs" (e.g. a "Study Notes" RC of OBS study notes).
 var obsSubjects = map[string]string{
@@ -37,14 +64,41 @@ func ResolveSubject(subject string, projectIDs []string) string {
 	if strings.EqualFold(subject, "bible stories") {
 		subject = "Open Bible Stories"
 	}
-	if after, ok := strings.CutPrefix(subject, "Translator "); ok {
-		subject = "Translation " + after
+	const translator = "Translator "
+	if len(subject) > len(translator) && strings.EqualFold(subject[:len(translator)], translator) {
+		subject = "Translation " + subject[len(translator):]
 	}
+	subject = registeredSpelling(subject)
 	if alias, ok := subjectAliases[subject]; ok {
 		subject = alias
 	}
 	if obs, ok := obsSubjects[subject]; ok && onlyOBS(projectIDs) {
 		subject = obs
+	}
+	return subject
+}
+
+// ResolveRCSubject is ResolveSubject for an RC manifest: when its dublin_core names
+// no subject, the subject comes from its dublin_core.identifier (e.g. "ta").
+func ResolveRCSubject(subject, identifier string, projectIDs []string) string {
+	if strings.TrimSpace(subject) == "" {
+		subject = identifierSubjects[strings.ToLower(strings.TrimSpace(identifier))]
+	}
+	return ResolveSubject(subject, projectIDs)
+}
+
+// registeredSpelling returns the registered subject or alias the subject names,
+// ignoring case (e.g. "Open Bible stories"), or the subject unchanged.
+func registeredSpelling(subject string) string {
+	for _, s := range handler.SupportedSubjects() {
+		if strings.EqualFold(s, subject) {
+			return s
+		}
+	}
+	for alias := range subjectAliases {
+		if strings.EqualFold(alias, subject) {
+			return alias
+		}
 	}
 	return subject
 }
@@ -77,5 +131,5 @@ func manifestSubject(manifest *rc.Manifest) string {
 	for _, p := range manifest.Projects {
 		ids = append(ids, p.Identifier)
 	}
-	return ResolveSubject(manifest.DublinCore.Subject, ids)
+	return ResolveRCSubject(manifest.DublinCore.Subject, manifest.DublinCore.Identifier, ids)
 }

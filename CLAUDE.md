@@ -32,7 +32,7 @@ The single entry point is `Convert()` in `convert.go`:
 func Convert(ctx context.Context, inDir string, outDir string, opts Options) (Result, error)
 ```
 
-- Reads `manifest.yaml` from `inDir`, resolves the subject with `ResolveSubject()` (spelling variants, aliases, OBS forms of helps subjects), looks up the handler, runs conversion, writes `metadata.json` to `outDir`.
+- Reads `manifest.yaml` from `inDir`, resolves the subject with `ResolveRCSubject()` (identifier fallback for a missing subject, then `ResolveSubject()`: spelling and case variants, aliases, OBS forms of helps subjects), looks up the handler, runs conversion, writes `metadata.json` to `outDir`.
 - `Options.PayloadPath` specifies an explicit path to a `<lang>_tw` directory for TWL payload creation. If empty, auto-detects `<lang>_tw/` inside `inDir`.
 - `Options.TWLPath` specifies an explicit path to a `<lang>_twl` directory for TW conversion. If empty, auto-detects `<lang>_twl/` inside `inDir`.
 - `Options.USFMPath` specifies a directory containing USFM files for localized Bible book names (used by TSV handlers). Bible handlers read USFM directly from their own input files.
@@ -46,7 +46,7 @@ func Convert(ctx context.Context, inDir string, outDir string, opts Options) (Re
 ```
 go-rc2sb/
 ├── convert.go              # Public Convert() function, orchestration
-├── subject.go              # ResolveSubject(), Supports(), SupportedSubjects()
+├── subject.go              # ResolveSubject(), ResolveRCSubject(), Supports(), SupportedSubjects()
 ├── options.go              # Options and Result types
 ├── cmd/rc2sb/
 │   └── main.go             # CLI wrapper
