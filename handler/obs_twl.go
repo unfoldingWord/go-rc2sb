@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/unfoldingWord/go-rc2sb/books"
 	"github.com/unfoldingWord/go-rc2sb/rc"
 	"github.com/unfoldingWord/go-rc2sb/sb"
 )
@@ -16,9 +15,9 @@ import (
 //
 // OBS Translation Words Links are converted like the Bible TSV Translation Words
 // Links handler (parascriptural/x-bcvarticles, with a Translation Words payload and
-// rc:// link rewriting). The difference is that OBS is treated as a single book —
-// each story is a chapter and each frame a verse — so the scope is keyed on the
-// "OBS" book code and the lone project is twl_OBS.tsv -> OBS.tsv.
+// rc:// link rewriting). The difference is that the lone project is twl_OBS.tsv -> OBS.tsv,
+// and "OBS" is no SB book ID, so the scope is the Bible passages the stories cover, as the
+// Open Bible Stories handler scopes the stories themselves.
 func NewOBSTWLHandler() Handler {
 	return &obsTWLHandler{}
 }
@@ -79,7 +78,7 @@ func (h *obsTWLHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDi
 	}
 
 	// Process the OBS TWL project(s) — normally a single twl_OBS.tsv.
-	currentScope := make(map[string][]string)
+	scope := obsStoriesScope()
 	for _, project := range manifest.Projects {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -94,11 +93,6 @@ func (h *obsTWLHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDi
 		// Strip "twl_" prefix: "twl_OBS.tsv" -> "OBS.tsv"
 		destFilename := strings.TrimPrefix(srcFilename, "twl_")
 		ingredientKey := "ingredients/" + destFilename
-
-		// OBS is the book; stories map to chapters and frames to verses.
-		bookCode := books.CodeFromProjectID(strings.ToLower(project.Identifier))
-		scope := map[string][]string{bookCode: {}}
-		currentScope[bookCode] = []string{}
 
 		if hasPayload {
 			// Copy TSV with rc:// link rewriting to ./payload/ paths.
@@ -117,7 +111,7 @@ func (h *obsTWLHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDi
 		}
 	}
 
-	m.Type.FlavorType.CurrentScope = currentScope
+	m.Type.FlavorType.CurrentScope = scope
 
 	// Copy common root files (README.md, .gitignore, .gitea, .github).
 	if err := CopyCommonRootFiles(inDir, outDir, m); err != nil {

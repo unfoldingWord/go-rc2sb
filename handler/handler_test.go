@@ -803,9 +803,13 @@ func TestOBSTWL_TypeAndIdentity(t *testing.T) {
 		t.Errorf("Flavor.Name = %q; want %q", got, "x-bcvarticles")
 	}
 
-	// OBS is the book — scope is keyed on the OBS book code.
-	if _, ok := metadata.Type.FlavorType.CurrentScope["OBS"]; !ok {
-		t.Errorf("CurrentScope missing OBS key; got %v", metadata.Type.FlavorType.CurrentScope)
+	// "OBS" is no SB book ID: the scope is the Bible passages the stories cover
+	scope := metadata.Type.FlavorType.CurrentScope
+	if _, ok := scope["OBS"]; ok || len(scope["GEN"]) == 0 {
+		t.Errorf("CurrentScope should cover the stories' Bible books, not OBS; got %v", scope)
+	}
+	if ing, ok := metadata.Ingredients["ingredients/OBS.tsv"]; !ok || len(ing.Scope["GEN"]) == 0 {
+		t.Errorf("OBS.tsv ingredient should carry the same scope; got %+v", metadata.Ingredients["ingredients/OBS.tsv"])
 	}
 
 	// OBS localized name.

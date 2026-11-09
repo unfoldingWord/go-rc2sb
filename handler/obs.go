@@ -78,19 +78,11 @@ func (h *obsHandler) Subject() string {
 	return "Open Bible Stories"
 }
 
-func (h *obsHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, outDir string, opts Options) (*sb.Metadata, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-
-	m := BuildBaseMetadata(manifest, opts, "OBS")
-
-	// Build currentScope as the deduplicated union of all OBS story scopes.
-	// The SB scope schema requires each book's reference array to have unique
-	// items (oneOf: non-empty array with uniqueItems, or empty array), so the
-	// same reference contributed by multiple stories (e.g. 2SA "7" from stories
-	// 17, 21, and 48) must appear only once. Stories are iterated in sorted
-	// order so the resulting reference order is deterministic across runs.
+// obsStoriesScope is the Bible passages all 50 stories cover, as the deduplicated union of
+// obsStoryScopes. The SB scope schema wants each book's references unique, so a reference
+// several stories share (e.g. 2SA "7" from stories 17, 21 and 48) appears once; stories
+// are taken in order so the result is the same on every run.
+func obsStoriesScope() map[string][]string {
 	currentScope := make(map[string][]string)
 	seen := make(map[string]map[string]bool) // book -> ref -> already added
 	storyNums := make([]string, 0, len(obsStoryScopes))
@@ -112,6 +104,17 @@ func (h *obsHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, 
 			}
 		}
 	}
+	return currentScope
+}
+
+func (h *obsHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, outDir string, opts Options) (*sb.Metadata, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	m := BuildBaseMetadata(manifest, opts, "OBS")
+
+	currentScope := obsStoriesScope()
 
 	// Set type - OBS uses gloss/textStories
 	m.Type = sb.Type{
